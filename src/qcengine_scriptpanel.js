@@ -593,13 +593,13 @@ function QScriptInterface(qReg)
 
     this.invQFT = function(target_mask=0)
     {
-        this.QFT(target_mask, true)
+        this.QFT(target_mask, true);
     }
 
     this.QFT = function(target_mask=0, flip_h=false)
     {
         if (flip_h)
-            this.reverse_bits(target_mask)
+            this.reverse_bits(target_mask);
         var bits = this.qReg.numQubits;
         for (var i = 0; i < bits; ++i)
         {
@@ -611,6 +611,8 @@ function QScriptInterface(qReg)
             {
                 this.hadamard(mask1);
                 var theta = -90.0;
+                if (flip_h)
+                    theta = -theta; // If we're inverting, the phases need to be negative
                 for (var j = i + 1; j < bits; ++j)
                 {
                     var bit2 = bits - (j + 1);
@@ -626,7 +628,7 @@ function QScriptInterface(qReg)
             }
         }
         if (!flip_h)
-            this.reverse_bits(target_mask)
+            this.reverse_bits(target_mask);
     }
 
     this.fast_cnot = function(mask, cond) { this.qReg.cnot(this.flat(mask), this.flat(cond)); }
