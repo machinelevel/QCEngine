@@ -225,7 +225,7 @@ function QTest()
         if (qReg.readAll() != tracker)
             this.error("  : write and read don't match: (" + qReg.readAll() + " != " + tracker + ")");
 
-        qReg.phaseShift(1);
+        qReg.single_qubit_phase(1, 180);
     }
 }
 
