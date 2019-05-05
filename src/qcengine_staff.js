@@ -38,6 +38,11 @@
 
 var qc_options = {
     start_qubits_from: 0,
+    double_ff_line: false,
+    auto_draw: true,
+    print_function: null,
+    max_staff_width: 1024,
+    max_staff_height: 1024
 };    // A general bucket for collecting global options
 
 
@@ -125,8 +130,14 @@ function QInstruction(op, targetQubits, conditionQubits, theta, codeLabel, auxQu
             qReg.crotatex(this.targetQubits, this.conditionQubits, theta * direction);
         else if (op == 'rotatey')
             qReg.rotatey(this.targetQubits, theta * direction);
+        else if (op == 'rotatez')
+            qReg.rotatez(this.targetQubits, theta * direction);
+        else if (op == 'y')
+            qReg.y(this.targetQubits, this.conditionQubits);
         else if (op == 'crotatey')
             qReg.crotatey(this.targetQubits, this.conditionQubits, theta * direction);
+        else if (op == 'crotatez')
+            qReg.crotatez(this.targetQubits, this.conditionQubits, theta * direction);
         else if ((op == 'crootnot' && direction > 0) || (op == 'crootnot_inv' && direction < 0))
             qReg.crootnot(this.targetQubits, this.conditionQubits);
         else if ((op == 'crootnot_inv' && direction > 0) || (op == 'crootnot' && direction < 0))
@@ -138,7 +149,7 @@ function QInstruction(op, targetQubits, conditionQubits, theta, codeLabel, auxQu
         else if (op == 'noise')
             qReg.noise(this.theta, this.targetQubits);
         else if (op == 'phase')
-            qReg.phaseShift(this.conditionQubits, this.theta * direction);
+            qReg.multi_qubit_phase(this.targetQubits, this.conditionQubits, this.theta * direction);
         else if (op == 'optical_phase')
             qReg.optical_phase(this.conditionQubits, this.theta * direction);
         else if (op == 'optical_beamsplitter')
@@ -197,35 +208,35 @@ function QInstruction(op, targetQubits, conditionQubits, theta, codeLabel, auxQu
     // create (if necessary) and setup a block job
     this.nextBlockJob = function(qBlock1, qBlock2)
     {
-        var bj;
-        if (this.blockJobsInUse < this.blockJobs.length)
-        {
-            bj = this.blockJobs[this.blockJobsInUse];
-        }
-        else
-        {
-            bj = new BlockJob();
-            this.blockJobs.push(bj);
-        }
-        this.blockJobsInUse++;
-        bj.setup(this, qBlock1, qBlock2);
+        // var bj;
+        // if (this.blockJobsInUse < this.blockJobs.length)
+        // {
+        //     bj = this.blockJobs[this.blockJobsInUse];
+        // }
+        // else
+        // {
+        //     bj = new BlockJob();
+        //     this.blockJobs.push(bj);
+        // }
+        // this.blockJobsInUse++;
+        // bj.setup(this, qBlock1, qBlock2);
     }
 
     // Return the number of block jobs remaining to start.
     this.serviceBlockJobs = function(qReg)
     {
-        if (this.isFinished())
-            return 0;
-        for (var i = this.firstWaitingBlockJob; i < this.blockJobsInUse; ++i)
-        {
-            if (this.blockJobs[i].started)
-            {
-                this.blockJobs[i].start();
-                this.firstWaitingBlockJob = i + 1;
-                return this.firstWaitingBlockJob - i;
-            }
-        }
-        this.setFinished();
+        // if (this.isFinished())
+        //     return 0;
+        // for (var i = this.firstWaitingBlockJob; i < this.blockJobsInUse; ++i)
+        // {
+        //     if (this.blockJobs[i].started)
+        //     {
+        //         this.blockJobs[i].start();
+        //         this.firstWaitingBlockJob = i + 1;
+        //         return this.firstWaitingBlockJob - i;
+        //     }
+        // }
+        // this.setFinished();
         return 0;   // all jobs have started
     }
 
@@ -256,7 +267,106 @@ function QInstruction(op, targetQubits, conditionQubits, theta, codeLabel, auxQu
         ctx.lineWidth = 2;
         ctx.fillStyle = 'white';
 
-        if (this.op == 'cnot' || this.op == 'not')
+
+        if (this.op == 'phase' || this.op == 'cphase')
+        {
+            if (this.theta == 180)
+            {
+                // Z gate
+                ctx.lineWidth = 1;
+                ctx.fillStyle = 'white';
+                ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+                ctx.strokeRect(x - radius, y - radius, radius * 2, radius * 2);
+
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                var hradx = 0.4 * radius;
+                var hrady = 0.4 * radius;
+                ctx.lineTo(x - hradx, y - hrady);
+                ctx.lineTo(x + hradx * 0.7, y - hrady);
+                ctx.lineTo(x - hradx * 0.7, y + hrady);
+                ctx.lineTo(x + hradx, y + hrady);
+                ctx.stroke();
+            }
+            else if (this.theta == 90 || this.theta == -90)
+            {
+                // S gate
+                ctx.lineWidth = 1;
+                ctx.fillStyle = 'white';
+                ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+                ctx.strokeRect(x - radius, y - radius, radius * 2, radius * 2);
+
+                // inverse
+                if (this.theta < 0)
+                {
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.lineTo(x + radius * 0.6, y - radius * 0.1);
+                    ctx.lineTo(x + radius * 0.3, y - radius * 0.1);
+                    ctx.moveTo(x + radius * 0.8, y - radius * 0.5);
+                    ctx.lineTo(x + radius * 0.8, y + radius * 0.3);
+                    ctx.stroke();
+                }
+
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                var hradx = 0.4 * radius;
+                var hrady = 0.4 * radius;
+                ctx.lineTo(x + hradx, y - hrady);
+                ctx.lineTo(x - hradx * 0.5, y - hrady);
+                ctx.lineTo(x - hradx * 0.7, y - hrady * 0.5);
+                ctx.lineTo(x + hradx * 0.7, y + hrady * 0.5);
+                ctx.lineTo(x + hradx * 0.5, y + hrady);
+                ctx.lineTo(x - hradx, y + hrady);
+                ctx.stroke();
+            }
+            else if (this.theta == 45 || this.theta == -45)
+            {
+                // T gate
+                ctx.lineWidth = 1;
+                ctx.fillStyle = 'white';
+                ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+                ctx.strokeRect(x - radius, y - radius, radius * 2, radius * 2);
+
+                // inverse
+                if (this.theta < 0)
+                {
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.lineTo(x + radius * 0.6, y - radius * 0.1);
+                    ctx.lineTo(x + radius * 0.3, y - radius * 0.1);
+                    ctx.moveTo(x + radius * 0.8, y - radius * 0.5);
+                    ctx.lineTo(x + radius * 0.8, y + radius * 0.3);
+                    ctx.stroke();
+                }
+
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                var hradx = 0.5 * radius;
+                var hrady = 0.5 * radius;
+                ctx.lineTo(x - hradx, y - hrady);
+                ctx.lineTo(x + hradx, y - hrady);
+                ctx.lineTo(x, y - hrady);
+                ctx.lineTo(x, y + hrady);
+                ctx.stroke();
+            }
+            else
+            {
+                // Large phase circle
+                ctx.fillStyle = 'white';
+                var scale_down = 0.85;
+                strokeCircle(ctx, x, y, radius * scale_down);
+                fillCircle(ctx, x, y, radius * scale_down);
+
+                ctx.lineWidth = 1;
+                strokeCircle(ctx, x, y, radius * scale_down * 0.15 / 0.35);
+                ctx.beginPath();
+                ctx.lineTo(x + radius * 0.05,  y - radius * 0.7);
+                ctx.lineTo(x - radius * 0.05, y + radius * 0.7);
+                ctx.stroke();
+            }
+        }
+        else if (this.op == 'cnot' || this.op == 'not')
         {
             fillCircle(ctx, x, y, radius);
             ctx.lineWidth = 2;
@@ -743,6 +853,24 @@ function QInstruction(op, targetQubits, conditionQubits, theta, codeLabel, auxQu
             ctx.lineTo(x + hradx, y + hrady);
             ctx.stroke();
         }
+        else if (this.op == 'y')
+        {
+            ctx.lineWidth = 1;
+            ctx.fillStyle = 'white';
+            ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+            ctx.strokeRect(x - radius, y - radius, radius * 2, radius * 2);
+
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            var hradx = 0.4 * radius;
+            var hrady = 0.6 * radius;
+            ctx.lineTo(x - hradx, y - hrady);
+            ctx.lineTo(x, y);
+            ctx.lineTo(x + hradx, y - hrady);
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, y + hrady);
+            ctx.stroke();
+        }
         else if (this.op == 'push_mixed' || this.op == 'use_mixed')
         {
             ctx.lineWidth = 1;
@@ -799,7 +927,8 @@ function QInstruction(op, targetQubits, conditionQubits, theta, codeLabel, auxQu
             ctx.stroke();
         }
         else if (this.op == 'crotatex' || this.op == 'rotatex'
-                || this.op == 'crotatey' || this.op == 'rotatey')
+                || this.op == 'crotatey' || this.op == 'rotatey'
+                || this.op == 'crotatez' || this.op == 'rotatez')
         {
             ctx.lineWidth = 1;
             ctx.fillStyle = 'white';
@@ -837,13 +966,22 @@ function QInstruction(op, targetQubits, conditionQubits, theta, codeLabel, auxQu
                 ctx.moveTo(x + hradx, y - hrady);
                 ctx.lineTo(x - hradx, y + hrady);
             }
-            else
+            else if (this.op == 'crotatey' || this.op == 'rotatey')
             {
                 ctx.moveTo(x + hradx, y - hrady);
                 ctx.lineTo(x, y);
                 ctx.moveTo(x - hradx, y - hrady);
                 ctx.lineTo(x, y);
                 ctx.lineTo(x, y + hrady);
+            }
+            else if (this.op == 'crotatez' || this.op == 'rotatez')
+            {
+                hradx *= 0.8;
+                hrady *= 0.9;
+                ctx.moveTo(x - hradx, y - hrady);
+                ctx.lineTo(x + hradx, y - hrady);
+                ctx.lineTo(x - hradx, y + hrady);
+                ctx.lineTo(x + hradx, y + hrady);
             }
             ctx.stroke();
         }
@@ -1252,8 +1390,8 @@ function QStaff(qReg, qPanel, pos)
         this.qReg.setZero();
         this.qReg.pokeComplexValue(0, 1, 0);
 
-        if (panel_chart)
-            panel_chart.startAnimation(null);
+        if (qc && qc.panel_chart)
+            qc.panel_chart.startAnimation(null);
 //        DrawAllPanels();
     }
 
@@ -1472,8 +1610,8 @@ function QStaff(qReg, qPanel, pos)
         }
         this.qReg.animateWidgets = anim_val;
 //        this.draw();
-        if (this.qReg.animateWidgets && panel_chart)
-            panel_chart.startAnimation(instruction);
+        if (this.qReg.animateWidgets && qc && qc.panel_chart)
+            qc.panel_chart.startAnimation(instruction);
     }
 
     this.setCodeLabel = function(codeLabel)
@@ -2017,6 +2155,42 @@ function QStaff(qReg, qPanel, pos)
                             ctx.moveTo(0, this.gridSize * minBit);
                             ctx.lineTo(0, this.gridSize * maxBit);
                             ctx.stroke();
+
+                            // Now, if there are any classical bits, draw double lines
+                            if (qc_options.double_ff_line)
+                            {
+                                var old_bit = minBit;
+                                var old_classical = false;
+                                var old_cond = false;
+                                var old_targ = false;
+                                for (var bit = minBit; bit <= maxBit; ++bit)
+                                {
+                                    var is_cond = instruction.conditionQubits.getBit(bit);
+                                    var is_targ = instruction.targetQubits.getBit(bit);
+                                    if (is_cond || is_targ)
+                                    {
+                                        var is_classical = !this.wire_grid[slot].getBit(bit);
+                                        if ((is_cond && is_classical) || (old_cond && old_classical))
+                                        {
+                                            ctx.beginPath();
+                                            ctx.moveTo(0, this.gridSize * bit);
+                                            ctx.lineTo(0, this.gridSize * old_bit);
+                                            ctx.strokeStyle = 'black';
+                                            ctx.lineWidth = 4;
+                                            ctx.stroke();
+                                            ctx.strokeStyle = 'white';
+                                            ctx.lineWidth = 2;
+                                            ctx.stroke();
+                                            ctx.strokeStyle = 'black';
+                                            ctx.lineWidth = 2;
+                                        }
+                                        old_bit = bit;
+                                        old_classical = is_classical;
+                                        old_cond = is_cond;
+                                        old_targ = is_targ;
+                                    }
+                                }
+                            }
                         }
                     }
                     if (dim)
@@ -2033,8 +2207,10 @@ function QStaff(qReg, qPanel, pos)
                         || (instruction.op == 'phase')
                         || (instruction.op == 'rotatex')
                         || (instruction.op == 'rotatey')
+                        || (instruction.op == 'rotatez')
                         || (instruction.op == 'crotatex')
                         || (instruction.op == 'crotatey')
+                        || (instruction.op == 'crotatez')
                         )
                     {
                         ctx.save();
@@ -2068,9 +2244,11 @@ function QStaff(qReg, qPanel, pos)
                             if (instruction.op == 'phase')
                             {
                                 // No label for a simple CZ
-                                if (instruction.conditionQubits.countOneBits() > 1)
+//                                if (instruction.conditionQubits.countOneBits() > 1)
                                 {
-                                    if (instruction.theta == 180.0)
+                                    if (instruction.theta == 180.0
+                                        || instruction.theta == 90.0
+                                        || instruction.theta == 45.0)
                                         special_phase = true;
                                 }
                             }
@@ -2098,14 +2276,58 @@ function QStaff(qReg, qPanel, pos)
 //        + ' t:' + bitfieldHexString(instruction.targetQubits)
 //        + ' c:' + bitfieldHexString(instruction.conditionQubits)
 //        );
-                    if (instruction.targetQubits.getBit(bit))
+                    var is_targ = instruction.targetQubits.getBit(bit);
+                    var is_cond = instruction.conditionQubits.getBit(bit);
+                    var num_targ = instruction.targetQubits.countOneBits();
+                    var num_cond = instruction.conditionQubits.countOneBits();
+                    if (instruction.op == 'phase' && (is_targ || is_cond))
+                    {
+                        if (is_targ || is_cond)
+                        {
+                            var do_large_phase_marker = false;
+                            if (instruction.theta == 180.0)
+                            {
+                                if (num_cond == 0
+                                    || (is_targ && num_targ > 1 && num_cond > 0)
+                                    || (num_targ + num_cond) == 1)
+                                {
+                                    do_large_phase_marker = true;
+                                }
+                            }
+                            else if (instruction.theta == 45.0 ||
+                                instruction.theta == -45.0 ||
+                                instruction.theta == 90.0 ||
+                                instruction.theta == -90.0)
+                            {
+                                if (is_targ || num_targ == 0)
+                                    do_large_phase_marker = true;
+                            }
+                            else
+                            {
+                                if (is_targ || num_targ == 0 || num_targ == 1)
+                                    do_large_phase_marker = true;
+                            }
+
+                            if (do_large_phase_marker)
+                            {
+                                instruction.draw(ctx, 0, this.gridSize * bit, radius, bit, this, instruction_x, slot);
+                            }
+                            else
+                            {
+                                // Draw just a dot
+                                ctx.fillStyle = 'black';
+                                fillCircle(ctx, 0, this.gridSize * bit, this.gridSize * 0.2);
+                            }
+                        }
+                    }                    
+                    else if (is_targ)
                     {
 //    if (inst == 0) console.log('draw3 ' + bit + ' ' + instruction.op
 //        + ' t:' + bitfieldHexString(instruction.targetQubits)
 //        + ' c:' + bitfieldHexString(instruction.conditionQubits)
 //        );
                         instruction.draw(ctx, 0, this.gridSize * bit, radius, bit, this, instruction_x, slot);
-                    }
+                    }                    
                     else if (instruction.auxQubits && instruction.auxQubits.getBit(bit)
                             && instruction.op == 'dual_rail_beamsplitter')
                     {
@@ -2154,7 +2376,7 @@ function QStaff(qReg, qPanel, pos)
 
 
                     }
-                    else if (instruction.conditionQubits.getBit(bit))
+                    else if (is_cond)
                     {
                         if (instruction.op == 'phase' || instruction.op == 'optical_phase')
                         {
@@ -2163,7 +2385,24 @@ function QStaff(qReg, qPanel, pos)
                             var cz_dots = false;
                             if (instruction.theta == 0.0 || instruction.theta == 180.0)
                             {
-                                if (instruction.conditionQubits.countOneBits() > 1)
+                                // If there's more than one target, use dots for the conditions
+                                if (num_targ > 1)
+                                    cz_dots = true;
+                                // If there's one target or no targets, and more than one qubit involved, use dots
+                                if (num_cond + num_targ > 1 && num_targ <= 1)
+                                    cz_dots = true;
+                            }
+                            else if (instruction.theta == 45.0 || instruction.theta == -45.0
+                                    || instruction.theta == 90.0 || instruction.theta == -90.0)
+                            {
+                                // if there's at least one target
+                                if (num_targ > 0)
+                                    cz_dots = true;
+                            }
+                            else
+                            {
+                                // If there's more than one target, use dots for the conditions
+                                if (num_targ > 1)
                                     cz_dots = true;
                             }
                             if (instruction.theta == 0.0)   // Dim phase gates which do nothing
@@ -2175,15 +2414,16 @@ function QStaff(qReg, qPanel, pos)
                             }
                             else
                             {
-                                ctx.fillStyle = 'white';
-                                strokeCircle(ctx, 0, this.gridSize * bit, this.gridSize * 0.35);
-                                fillCircle(ctx, 0, this.gridSize * bit, this.gridSize * 0.35);
+                                // // Large phase circle
+                                // ctx.fillStyle = 'white';
+                                // strokeCircle(ctx, 0, this.gridSize * bit, this.gridSize * 0.35);
+                                // fillCircle(ctx, 0, this.gridSize * bit, this.gridSize * 0.35);
 
-                                strokeCircle(ctx, 0, this.gridSize * bit, this.gridSize * 0.15);
-                                ctx.beginPath();
-                                ctx.lineTo(this.gridSize * 0.03,  this.gridSize * bit - this.gridSize * 0.3);
-                                ctx.lineTo(-this.gridSize * 0.03, this.gridSize * bit + this.gridSize * 0.3);
-                                ctx.stroke();
+                                // strokeCircle(ctx, 0, this.gridSize * bit, this.gridSize * 0.15);
+                                // ctx.beginPath();
+                                // ctx.lineTo(this.gridSize * 0.03,  this.gridSize * bit - this.gridSize * 0.3);
+                                // ctx.lineTo(-this.gridSize * 0.03, this.gridSize * bit + this.gridSize * 0.3);
+                                // ctx.stroke();
                             }
                             if (instruction.theta == 0.0)
                                 ctx.globalAlpha = 1.0;
@@ -2358,14 +2598,30 @@ function QStaff(qReg, qPanel, pos)
 
                     if (old_style != new_style || col == this.wire_grid.length - 1)
                     {
-                        ctx.strokeStyle = old_style;
                         ctx.beginPath();
                         ctx.moveTo(startx, 0);
                         if (col == this.wire_grid.length - 1)
                             ctx.lineTo(x2, 0);
                         else
                             ctx.lineTo(x1, 0);
-                        ctx.stroke();
+                        if (old_style == light && qc_options.double_ff_line)
+                        {
+                            // Double horizontal line, dark
+                            ctx.strokeStyle = dark;
+                            ctx.lineWidth = 4;
+                            ctx.stroke();
+                            ctx.strokeStyle = 'white';
+                            ctx.lineWidth = 3;
+                            ctx.stroke();
+                            ctx.lineWidth = 1;
+                            ctx.strokeStyle = dark;
+                        }
+                        else
+                        {
+                            // Single horizontal line, light or dark
+                            ctx.strokeStyle = old_style;
+                            ctx.stroke();
+                        }
                         startx = x1;
                         old_style = new_style;
                     }
@@ -2608,13 +2864,6 @@ function QStaff(qReg, qPanel, pos)
         }
     }
 
-    this.renderModel = function ()
-    {
-        var frame = document.getElementById('render_frame');
-        if (frame)
-                frame.contentWindow.update_model(this);
-    }
-
     this.makeWireGrid = function()
     {
         var num_columns = this.instructions.length + 1;
@@ -2730,18 +2979,21 @@ function QStaff(qReg, qPanel, pos)
     this.fullSnapshot = function (max_width, max_height)
     {
         if (max_width == null)
-            max_width = 1024;
+            max_width = qc_options.max_staff_width;
         if (max_height == null)
-            max_height = 1024;
+            max_height = qc_options.max_staff_height;
 //        this.simplify1();
-        this.qPanel.setVisible(true);
-        var wd = this.getFullWidth();
+        var wd = this.getFullWidth() + 500;
         var ht = this.getFullHeight();
         if (max_width && wd > max_width)
             wd = max_width;
         if (max_height && ht > max_height)
             ht = max_height;
-        this.qPanel.setSize(wd, ht);
+        if (this.qPanel)
+        {
+            this.qPanel.setVisible(true);
+            this.qPanel.setSize(wd, ht);
+        }
 //        this.qPanel.canvas.width = this.getFullWidth();
 //        this.qPanel.canvas.height = this.getFullHeight();
         this.draw(true); // Hide the insertion point

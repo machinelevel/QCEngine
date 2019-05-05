@@ -49,25 +49,20 @@ var allPanels = new Array();
 var draggedPanel = null;
 var draggedFrameCount = 0;
 var dragMode = 'move';  // 'move' or 'resize'
-var panel_stopwatch = null;
-var panel_chart = null;
-var panel_staff = null;
-var panel_chip = null;
-var panel_script = null;
-var panel_setup = null;
-var panel_script = null;
+// var panel_stopwatch = null;
+// var panel_chart = null;
+// var panel_staff = null;
+// var panel_chip = null;
+// var panel_script = null;
+// var panel_setup = null;
+// var panel_script = null;
 
 function Panel(canvas, div)
 {
-    this.canvas = canvas;
-    this.div = div;
-    div.panel = this;
     this.widgets = new Array();
     this.mouseX = 0;
     this.mouseY = 0;
     this.growBoxSize = 16;
-    if (this.canvas)
-        this.canvas.panel = this;
 
     this.dragMouseStartX = 0;
     this.dragMouseStartY = 0;
@@ -95,6 +90,117 @@ function Panel(canvas, div)
                 this.drawGrowBox(ctx);
         }
     }
+
+    this.set_canvas = function(canvas)
+    {
+        this.canvas = canvas;
+        if (this.canvas)
+            this.canvas.panel = this;
+    }
+    this.set_div = function(div)
+    {
+        this.div = div;
+        if (this.div)
+        {
+            this.div.panel = this;
+
+            this.div.ondblclick = function(e)
+            {
+                e.Handled = true;
+            }
+
+            this.div.onmousedown = function(e)
+            {
+                this.panel.getMousePos(e);
+
+                for (var i = this.panel.widgets.length - 1; i >= 0 && !e.Handled; --i)
+                {
+                    e.Handled = this.panel.widgets[i].mouseDown(
+                        this.panel.mouseX - this.panel.widgets[i].pos.x,
+                        this.panel.mouseY - this.panel.widgets[i].pos.y, e);
+                }
+                if (!e.Handled)
+                {
+                    // Start canvas drag
+                    this.panel.dragMouseStartX = e.pageX;
+                    this.panel.dragMouseStartY = e.pageY;
+                    this.panel.dragCanvasStartX = parseInt(this.panel.div.style.left);
+                    this.panel.dragCanvasStartY = parseInt(this.panel.div.style.top);
+                    this.panel.dragCanvasStartW = parseInt(this.panel.div.style.width);
+                    this.panel.dragCanvasStartH = parseInt(this.panel.div.style.height);
+                    draggedPanel = this.panel;
+                    draggedFrameCount = 0;
+                    if (this.panel.inGrowBox(this.panel.mouseX, this.panel.mouseY))
+                        dragMode = 'resize';
+                    else if (this.panel.inCloseBox(this.panel.mouseX, this.panel.mouseY))
+                        dragMode = 'close';
+                    else
+                        dragMode = 'move';
+                }
+                return false;   // Keep us from selecting text while dragging!!
+            }
+
+            this.div.onwheel = function(e)
+            {
+                for (var i = this.panel.widgets.length - 1; i >= 0 && !e.Handled; --i)
+                {
+                    if (this.panel.widgets[i].mouseWheel)
+                        e.Handled = this.panel.widgets[i].mouseWheel(e);
+                }
+                if (!e.Handled)
+                {
+                }
+                return false;   // Keep us from selecting text while dragging!!
+            }
+
+            this.div.onmouseup = function(e)
+            {
+                this.panel.getMousePos(e);
+                for (var i = this.panel.widgets.length - 1; i >= 0 && !e.Handled; --i)
+                {
+                    e.Handled = this.panel.widgets[i].mouseUp(
+                        this.panel.mouseX - this.panel.widgets[i].pos.x,
+                        this.panel.mouseY - this.panel.widgets[i].pos.y);
+                }
+            }
+
+            this.div.onmousemove = function(e)
+            {
+                this.panel.getMousePos(e);
+                for (var i = this.panel.widgets.length - 1; i >= 0 && !e.Handled; --i)
+                {
+                    e.Handled = this.panel.widgets[i].mouseMove(
+                        this.panel.mouseX - this.panel.widgets[i].pos.x,
+                        this.panel.mouseY - this.panel.widgets[i].pos.y);
+                }
+                return false;   // Keep us from selecting text while dragging!!
+            }
+
+            this.div.ontouchstart = function(e)
+            {
+                console.log('div ontouchstart!');
+                if (this.div && this.div.onmousedown)
+                    return this.div.onmousedown(e);
+                return true;
+            }
+
+            this.div.ontouchend = function(e)
+            {
+                console.log('div ontouchend!');
+                if (this.div && this.div.onmouseup)
+                    return this.div.onmouseup(e);
+                return true;
+            }
+
+            this.div.ontouchmove = function(e)
+            {
+                console.log('div ontouchmove!');
+                if (this.div && this.div.onmousemove)
+                    return this.div.onmousemove(e);
+                return true;
+            }
+        }
+    }
 /*
     this.startAnimation = function(instruction)
     {
@@ -104,6 +210,17 @@ function Panel(canvas, div)
         }
     }
 */
+    this.set_inverse_video = function(inverse)
+    {
+        this.inverse_video = inverse;
+        if (this.div)
+        {
+            if (this.inverse_video)
+                this.div.style.filter = 'invert(100%)';
+            else
+                this.div.style.filter = 'none';
+        }
+    }
     this.startAnimation = function(instruction)
     {
         var alreadyAnimating = false;
@@ -149,19 +266,25 @@ function Panel(canvas, div)
             this.canvas.width = width;
             this.canvas.height = height;
         }
-        this.div.style.width = width + 'px';
-        this.div.style.height = height + 'px';
+        if (this.div)
+        {
+            this.div.style.width = width + 'px';
+            this.div.style.height = height + 'px';
+        }
         this.draw();
     }
 
     this.setPos = function(left, top)
     {
-        this.div.style.left = left + 'px';
-        this.div.style.top = top + 'px';
-        if (this.attach_div)
+        if (this.div)
         {
-            this.attach_div.style.left = (left + this.attach_div_offset.x) + 'px';
-            this.attach_div.style.top = (top + this.attach_div_offset.y) + 'px';
+            this.div.style.left = left + 'px';
+            this.div.style.top = top + 'px';
+            if (this.attach_div)
+            {
+                this.attach_div.style.left = (left + this.attach_div_offset.x) + 'px';
+                this.attach_div.style.top = (top + this.attach_div_offset.y) + 'px';
+            }
         }
     }
 
@@ -174,13 +297,16 @@ function Panel(canvas, div)
                 this.bringToFront();
             vis = "block";
         }
-        this.div.style.display = vis;
+        if (this.div)
+            this.div.style.display = vis;
         if (this.attach_div)
             this.attach_div.style.display = vis;
     }
     this.isVisible = function()
     {
-        return this.div.style.display != "none";
+        if (this.div)
+            return this.div.style.display != "none";
+        return false;
     }
     this.toggleVisible = function()
     {
@@ -188,13 +314,11 @@ function Panel(canvas, div)
     }
     this.bringToFront = function()
     {
-        document.body.removeChild(this.div);
-        document.body.appendChild(this.div);
-//        if (this.attach_div)
-//        {
-//            document.body.removeChild(this.attach_div);
-//            document.body.appendChild(this.attach_div);
-//        }
+        if (this.div)
+        {
+            document.body.removeChild(this.div);
+            document.body.appendChild(this.div);
+        }
     }
 
     this.getMousePos = function(e)
@@ -213,27 +337,26 @@ function Panel(canvas, div)
 
     
 
-    this.div.ondblclick = function(e)
-    {
-        e.Handled = true;
-    }
-
     this.drawCloseBox = function(ctx)
     {
     }
 
     this.drawGrowBox = function(ctx)
     {
-        ctx.strokeStyle = 'black';
-        ctx.fillStyle = 'white';
-        ctx.globalAlpha = 0.5;
-        var x = this.width - this.growBoxSize;
-        var y = this.height - this.growBoxSize;
-        var w = this.growBoxSize * 1.5;
-        var h = this.growBoxSize * 1.5;
-        var radius = 4;
-        rounded_rect(ctx, x, y, w, h, radius, true, true)
-        ctx.globalAlpha = 1.0;
+        var enable_grow_box = false; // Disable grow boxes
+        if (enable_grow_box)
+        {
+            ctx.strokeStyle = 'black';
+            ctx.fillStyle = 'white';
+            ctx.globalAlpha = 0.5;
+            var x = this.width - this.growBoxSize;
+            var y = this.height - this.growBoxSize;
+            var w = this.growBoxSize * 1.5;
+            var h = this.growBoxSize * 1.5;
+            var radius = 4;
+            rounded_rect(ctx, x, y, w, h, radius, true, true)
+            ctx.globalAlpha = 1.0;
+        }
     }
 
     this.inCloseBox = function(x, y)
@@ -247,99 +370,8 @@ function Panel(canvas, div)
                 && y >= this.height - this.growBoxSize;
     }
 
-    this.div.onmousedown = function(e)
-    {
-        this.panel.getMousePos(e);
-
-        for (var i = this.panel.widgets.length - 1; i >= 0 && !e.Handled; --i)
-        {
-            e.Handled = this.panel.widgets[i].mouseDown(
-                this.panel.mouseX - this.panel.widgets[i].pos.x,
-                this.panel.mouseY - this.panel.widgets[i].pos.y, e);
-        }
-        if (!e.Handled)
-        {
-            // Start canvas drag
-            this.panel.dragMouseStartX = e.pageX;
-            this.panel.dragMouseStartY = e.pageY;
-            this.panel.dragCanvasStartX = parseInt(this.panel.div.style.left);
-            this.panel.dragCanvasStartY = parseInt(this.panel.div.style.top);
-            this.panel.dragCanvasStartW = parseInt(this.panel.div.style.width);
-            this.panel.dragCanvasStartH = parseInt(this.panel.div.style.height);
-            draggedPanel = this.panel;
-            draggedFrameCount = 0;
-            if (this.panel.inGrowBox(this.panel.mouseX, this.panel.mouseY))
-                dragMode = 'resize';
-            else if (this.panel.inCloseBox(this.panel.mouseX, this.panel.mouseY))
-                dragMode = 'close';
-            else
-                dragMode = 'move';
-        }
-        return false;   // Keep us from selecting text while dragging!!
-    }
-
-    this.div.onwheel = function(e)
-    {
-        for (var i = this.panel.widgets.length - 1; i >= 0 && !e.Handled; --i)
-        {
-            if (this.panel.widgets[i].mouseWheel)
-                e.Handled = this.panel.widgets[i].mouseWheel(e);
-        }
-        if (!e.Handled)
-        {
-        }
-        return false;   // Keep us from selecting text while dragging!!
-    }
-
-    this.div.onmouseup = function(e)
-    {
-        this.panel.getMousePos(e);
-        for (var i = this.panel.widgets.length - 1; i >= 0 && !e.Handled; --i)
-        {
-            e.Handled = this.panel.widgets[i].mouseUp(
-                this.panel.mouseX - this.panel.widgets[i].pos.x,
-                this.panel.mouseY - this.panel.widgets[i].pos.y);
-        }
-    }
-
-    this.div.onmousemove = function(e)
-    {
-        this.panel.getMousePos(e);
-        for (var i = this.panel.widgets.length - 1; i >= 0 && !e.Handled; --i)
-        {
-            e.Handled = this.panel.widgets[i].mouseMove(
-                this.panel.mouseX - this.panel.widgets[i].pos.x,
-                this.panel.mouseY - this.panel.widgets[i].pos.y);
-        }
-        return false;   // Keep us from selecting text while dragging!!
-    }
-
-    this.div.ontouchstart = function(e)
-    {
-        console.log('div ontouchstart!');
-        if (this.div && this.div.onmousedown)
-            return this.div.onmousedown(e);
-        return true;
-    }
-
-    this.div.ontouchend = function(e)
-    {
-        console.log('div ontouchend!');
-        if (this.div && this.div.onmouseup)
-            return this.div.onmouseup(e);
-        return true;
-    }
-
-    this.div.ontouchmove = function(e)
-    {
-        console.log('div ontouchmove!');
-        if (this.div && this.div.onmousemove)
-            return this.div.onmousemove(e);
-        return true;
-    }
-
-
-
+    this.set_canvas(canvas);
+    this.set_div(div);
     this.setVisible(false);
 }
 
@@ -351,74 +383,76 @@ function Panel(canvas, div)
 //{
 //}
 
-
-document.onmouseup = function(e)
+if (typeof document !== 'undefined')
 {
-    if (draggedPanel && dragMode == 'close')
+    document.onmouseup = function(e)
     {
-        draggedPanel.getMousePos(e);
-        if (draggedPanel.inCloseBox(draggedPanel.mouseX, draggedPanel.mouseY))
+        if (draggedPanel && dragMode == 'close')
         {
-            draggedPanel.setVisible(false);
+            draggedPanel.getMousePos(e);
+            if (draggedPanel.inCloseBox(draggedPanel.mouseX, draggedPanel.mouseY))
+            {
+                draggedPanel.setVisible(false);
+            }
+        }
+        draggedPanel = null;
+        return true;
+    }
+
+    document.onmousemove = function(e)
+    {
+        var mx = e.pageX;
+        var my = e.pageY;
+        if (draggedPanel)
+        {
+            if (draggedFrameCount == 0)
+            {
+                draggedPanel.bringToFront();
+            }
+            draggedFrameCount++;
+            if (dragMode == 'move')
+            {
+                var x = draggedPanel.dragCanvasStartX + mx - draggedPanel.dragMouseStartX;
+                var y = draggedPanel.dragCanvasStartY + my - draggedPanel.dragMouseStartY;
+                if (x < 0) x = 0;
+                if (y < 0) y = 0;
+                draggedPanel.setPos(x, y);
+            }
+            else if (dragMode == 'resize')
+            {
+                var x = draggedPanel.dragCanvasStartW + mx - draggedPanel.dragMouseStartX;
+                var y = draggedPanel.dragCanvasStartH + my - draggedPanel.dragMouseStartY;
+                if (x < 64) x = 64;
+                if (y < 64) y = 64;
+                draggedPanel.setSize(x, y);
+            }
         }
     }
-    draggedPanel = null;
-    return true;
-}
 
-document.onmousemove = function(e)
-{
-    var mx = e.pageX;
-    var my = e.pageY;
-    if (draggedPanel)
+    //document.ontouchstart = document.onmousedown;
+    //document.ontouchend = document.onmouseup;
+    //document.ontouchmove = document.onmousemove;
+
+    document.ontouchstart = function(e)
     {
-        if (draggedFrameCount == 0)
-        {
-            draggedPanel.bringToFront();
-        }
-        draggedFrameCount++;
-        if (dragMode == 'move')
-        {
-            var x = draggedPanel.dragCanvasStartX + mx - draggedPanel.dragMouseStartX;
-            var y = draggedPanel.dragCanvasStartY + my - draggedPanel.dragMouseStartY;
-            if (x < 0) x = 0;
-            if (y < 0) y = 0;
-            draggedPanel.setPos(x, y);
-        }
-        else if (dragMode == 'resize')
-        {
-            var x = draggedPanel.dragCanvasStartW + mx - draggedPanel.dragMouseStartX;
-            var y = draggedPanel.dragCanvasStartH + my - draggedPanel.dragMouseStartY;
-            if (x < 64) x = 64;
-            if (y < 64) y = 64;
-            draggedPanel.setSize(x, y);
-        }
+        console.log('doc ontouchstart!');
+        if (document.onmousedown)
+            document.onmousedown(e);
     }
-}
 
-//document.ontouchstart = document.onmousedown;
-//document.ontouchend = document.onmouseup;
-//document.ontouchmove = document.onmousemove;
+    document.ontouchend = function(e)
+    {
+        console.log('doc ontouchend!');
+        if (document.onmouseup)
+            document.onmouseup(e);
+    }
 
-document.ontouchstart = function(e)
-{
-    console.log('doc ontouchstart!');
-    if (document.onmousedown)
-        document.onmousedown(e);
-}
-
-document.ontouchend = function(e)
-{
-    console.log('doc ontouchend!');
-    if (document.onmouseup)
-        document.onmouseup(e);
-}
-
-document.ontouchmove = function(e)
-{
-    console.log('doc ontouchmove!');
-    if (document.onmousemove)
-        document.onmousemove(e);
+    document.ontouchmove = function(e)
+    {
+        console.log('doc ontouchmove!');
+        if (document.onmousemove)
+            document.onmousemove(e);
+    }
 }
 
 function radialPos(center, thetaDegrees, radius)
@@ -459,16 +493,14 @@ function createDiv(x, y)
     return divTag;
 }
 
-function createStopwatchPanel(myReg, x, y)
+function createStopwatchPanel(myReg, x=0, y=0, canvas=null, div=null, create_canvas=false, create_div=false)
 {
-    var div = createDiv(x, y);
-//    div.innerHTML = "new div!";
-//    var button = document.createElement("button");
-//    button.innerHTML = "a button";
-//    div.appendChild(button);
-
-    var canvas = document.createElement("canvas");
-    div.appendChild(canvas);
+    if (create_div)
+        div = createDiv(x, y);
+    if (create_canvas)
+        canvas = document.createElement("canvas");
+    if (div && canvas)
+        div.appendChild(canvas);
 
     var panel = new Panel(canvas, div);
     panel.setSize(602/2+50, 854/2+20);
@@ -498,18 +530,14 @@ function createStopwatchPanel(myReg, x, y)
     return panel;
 }
 
-function createStaffPanel(myReg, x, y)
+function createStaffPanel(myReg, x=0, y=0, canvas=null, div=null, create_canvas=false, create_div=false)
 {
-    var div = createDiv(x, y);
-//    div.innerHTML = "new div!";
-//    var button = document.createElement("button");
-//    button.innerHTML = "a button";
-//    div.appendChild(button);
-
-    var canvas = document.createElement("canvas");
-    if (!div)
-        return null;
-    div.appendChild(canvas);
+    if (create_div)
+        div = createDiv(x, y);
+    if (create_canvas)
+        canvas = document.createElement("canvas");
+    if (div && canvas)
+        div.appendChild(canvas);
 
     var panel = new Panel(canvas, div);
     panel.setSize(500, 150);
@@ -519,40 +547,40 @@ function createStaffPanel(myReg, x, y)
     return panel;
 }
 
-function createChartPanel(myReg, x, y)
+function createChartPanel(myReg, x=0, y=0, canvas=null, div=null, create_canvas=false, create_div=false)
 {
-    var div = createDiv(x, y);
-    if (!div)
-        return null;
-//    div.innerHTML = "new div!";
-//    var button = document.createElement("button");
-//    button.innerHTML = "a button";
-//    div.appendChild(button);
+    var int_menu_select = null;
+    var int_menu_div = null;
 
-    var canvas = document.createElement("canvas");
-    var int_menu_select = document.createElement("select");
-    var int_menu_div = document.createElement("div");
+    if (create_div)
+    {
+        div = createDiv(x, y);
+        int_menu_select = document.createElement("select");
+        int_menu_div = document.createElement("div");
+    }
+    if (create_canvas)
+        canvas = document.createElement("canvas");
+    if (div && canvas)
+        div.appendChild(canvas);
 
-//    div.appendChild(int_menu_div);
-    div.appendChild(canvas);
-    int_menu_div.appendChild(int_menu_select);
-    int_menu_div.style.width = '20' + 'px';
-    int_menu_div.style.height = '40' + 'px';
-//    int_menu_div.style.backgroundColor = 'green'; // 
-    int_menu_div.style.position = 'relative';
-    int_menu_div.style.zIndex = 1;
-    int_menu_div.style.left = 30;
-    int_menu_div.style.top = 30;
-    int_menu_div.style.display = "none";
-    document.body.appendChild(int_menu_div);
+    if (div)
+    {
+        div.appendChild(canvas);
+        int_menu_div.appendChild(int_menu_select);
+        int_menu_div.style.width = '20' + 'px';
+        int_menu_div.style.height = '40' + 'px';
+        int_menu_div.style.position = 'relative';
+        int_menu_div.style.zIndex = 1;
+        int_menu_div.style.left = 30;
+        int_menu_div.style.top = 30;
+        int_menu_div.style.display = "none";
+        document.body.appendChild(int_menu_div);
+    }
 
     var panel = new Panel(canvas, div);
     panel.setSize(500, 200);
 
     panel.int_menu_select = int_menu_select;
-/*    panel.attach_div = int_menu_div;
-    panel.attach_div_offset = {x:0,y:0};
-*/
     new QChart(myReg, panel, new Vec2(0, 0));
 
     return panel;
@@ -569,16 +597,9 @@ function createAllPanels(panelList)
     var numQubits = 1;
     var blockQubits = 1;
     var myReg = new QReg(numQubits, blockQubits, false);
-    var myInt = new QInt(numQubits, myReg);
-//    console.log("memory required: " + myReg.bytesRequired());
+    var myInt = new QInt(numQubits, 'a', myReg);
     myReg.activate();
     myReg.writeAll(1);
-
-    panel_setup = createSetupPanel(myReg, 520, 100);
-    panelList.push(panel_setup);
-
-//    panel_script = createScriptPanel(myReg, 520, 100);
-//    panelList.push(panel_script);
 
     panel_staff = createStaffPanel(myReg, 600, 470);
     panelList.push(panel_staff);
@@ -588,7 +609,6 @@ function createAllPanels(panelList)
 
     if (panel_chart && panel_chart.qReg)
         panel_chart.qReg.changed(); // force a draw
-//    panel_stopwatch.setVisible(true);
 }
 
 
@@ -690,17 +710,17 @@ function ImageLoaded()
     DrawAllPanels();  // TODO: This should just draw one, or queue it up
 }
 
-function Initialize()
-{
-    createAllPanels(allPanels);
-    LoadUserName();
-}
-    
-// Set it up!
-Initialize();
-
 
 
 
 // Node.js hookups
-module.exports.createDiv = createDiv;
+module.exports.createStaffPanel = createStaffPanel;
+module.exports.createChartPanel = createChartPanel;
+module.exports.draw_text = draw_text;
+module.exports.rounded_rect = rounded_rect;
+module.exports.rounded_rect_nosides = rounded_rect_nosides;
+module.exports.rounded_rect_leftonly = rounded_rect_leftonly;
+module.exports.rgbToHex = rgbToHex;
+module.exports.make_time_str = make_time_str;
+module.exports.make_font_size = make_font_size;
+

@@ -662,3 +662,5 @@ module.exports.bitfieldHexString = bitfieldHexString;
 module.exports.getLowestBitIndex = getLowestBitIndex;
 module.exports.getHighestBitIndex = getHighestBitIndex;
 module.exports.NewBitField = NewBitField;
+module.exports.getBitfieldBit = getBitfieldBit;
+module.exports.getBit = getBit;
