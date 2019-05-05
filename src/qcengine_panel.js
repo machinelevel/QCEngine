@@ -317,11 +317,14 @@ function Panel(canvas, div)
 
     this.bringToFront = function()
     {
-        var parent = this.div.parentNode;
-        if (parent)
+        if (this.div)
         {
-            parent.removeChild(this.div);
-            parent.appendChild(this.div);
+            var parent = this.div.parentNode;
+            if (parent)
+            {
+                parent.removeChild(this.div);
+                parent.appendChild(this.div);
+            }
         }
     }
 
