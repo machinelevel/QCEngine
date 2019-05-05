@@ -587,7 +587,7 @@ function QPhaseShiftCharm(qReg, panel, pos, bitMask, label)
 
 	charm.clickAction = function (x, y)
 	{
-        charm.qReg.phaseShift(charm.bitMask, 20);
+        charm.qReg.phaseShift(charm.bitMask, 0, 20);
 	}
     return charm;
 }
@@ -635,8 +635,13 @@ function QChart(qReg, panel, pos)
     this.qReg = qReg;
     this.panel = panel;
     this.pos = new Vec2(pos.x, pos.y);
-    this.width = this.panel.canvas.width - pos.x;
-    this.height = this.panel.canvas.height - pos.y;
+    this.width = 0;
+    this.height = 0;
+    if (this.panel.canvas)
+    {
+        this.width = this.panel.canvas.width - pos.x;
+        this.height = this.panel.canvas.height - pos.y;
+    }
     this.visible = true;
     this.in_use = true;
     this.hovered_fock_circle = -1;
@@ -718,6 +723,8 @@ function QChart(qReg, panel, pos)
         this.pos.y = total_height;
 
         // Decide if we're offscreen
+        if (!this.panel.canvas)
+            return;
         if (!this.in_use
             || this.pos.x >= this.panel.canvas.width
             || this.pos.y >= this.panel.canvas.height)
@@ -792,14 +799,16 @@ function QChart(qReg, panel, pos)
     {
         var need_redraw = false;
         var index = 0;
-        this.panel.int_menu_select.options[index++] = new Option("raw register", "(raw)");
-        var options = this.qReg.getQubitIntMenuArray();
-        for (var i = 0; i < options.length; ++i)
-            if (options[i].text.length > 0 && options[i].text[0] != '(')
-                this.panel.int_menu_select.options[index++] = options[i];
-        panel.int_menu_select.options.length = index;
-        panel.int_menu_select.onchange = this.selectIntMenu;
-
+        if (this.panel.int_menu_select)
+        {
+            this.panel.int_menu_select.options[index++] = new Option("raw register", "(raw)");
+            var options = this.qReg.getQubitIntMenuArray();
+            for (var i = 0; i < options.length; ++i)
+                if (options[i].text.length > 0 && options[i].text[0] != '(')
+                    this.panel.int_menu_select.options[index++] = options[i];
+            panel.int_menu_select.options.length = index;
+            panel.int_menu_select.onchange = this.selectIntMenu;
+        }
         var extra_widgets = 6;
         while (this.panel.widgets.length < this.qReg.qInts.length + extra_widgets)
         {
@@ -2126,14 +2135,14 @@ function QChart(qReg, panel, pos)
     }
 
     this.draw = function()
-    {        
+    {
         if (this.qInt && this.qInt.valid)
             this.numValues = 1 << this.qInt.numBits;
         else
             this.numValues = 1 << this.qReg.numQubits;
 
         this.calculateDimensions();
-        if (!this.visible)
+        if (!this.visible || !this.panel.canvas)
             return;
 
 //        this.width = this.panel.canvas.width;
@@ -2269,3 +2278,7 @@ function QChart(qReg, panel, pos)
 
 // Node.js hookups
 module.exports.Vec2 = Vec2;
+module.exports.QChart = QChart;
+module.exports.strokeCircle = strokeCircle;
+module.exports.fillCircle = fillCircle;
+
