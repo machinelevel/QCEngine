@@ -302,22 +302,26 @@ function Panel(canvas, div)
         if (this.attach_div)
             this.attach_div.style.display = vis;
     }
+    
     this.isVisible = function()
     {
         if (this.div)
             return this.div.style.display != "none";
         return false;
     }
+
     this.toggleVisible = function()
     {
         this.setVisible(!this.isVisible());
     }
+
     this.bringToFront = function()
     {
-        if (this.div)
+        var parent = this.div.parentNode;
+        if (parent)
         {
-            document.body.removeChild(this.div);
-            document.body.appendChild(this.div);
+            parent.removeChild(this.div);
+            parent.appendChild(this.div);
         }
     }
 

@@ -1104,10 +1104,12 @@ function QPU()
 {
     var staff_canvas = qc_options.staff_canvas;
     var staff_div = qc_options.staff_div;
+    var circle_canvas = qc_options.circle_canvas;
+    var circle_div = qc_options.circle_div;
     var num_qubits = 4;
     var qReg  = new QReg(num_qubits);
-    var staff_panel = createStaffPanel(qReg, 0, 0, staff_canvas, );
-    var chart_panel = createChartPanel(qReg);
+    var staff_panel = createStaffPanel(qReg, 0, 0, staff_canvas, staff_div);
+    var chart_panel = createChartPanel(qReg, 0, 0, circle_canvas, circle_div);
     var qc = new QScriptInterface(qReg);
     qc.panel_staff = staff_panel;
     qc.panel_chart = chart_panel;
