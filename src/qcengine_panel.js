@@ -573,15 +573,18 @@ function createChartPanel(myReg, x=0, y=0, canvas=null, div=null, create_canvas=
     if (div)
     {
         div.appendChild(canvas);
-        int_menu_div.appendChild(int_menu_select);
-        int_menu_div.style.width = '20' + 'px';
-        int_menu_div.style.height = '40' + 'px';
-        int_menu_div.style.position = 'relative';
-        int_menu_div.style.zIndex = 1;
-        int_menu_div.style.left = 30;
-        int_menu_div.style.top = 30;
-        int_menu_div.style.display = "none";
-        document.body.appendChild(int_menu_div);
+        if (int_menu_div)
+        {
+            int_menu_div.appendChild(int_menu_select);
+            int_menu_div.style.width = '20' + 'px';
+            int_menu_div.style.height = '40' + 'px';
+            int_menu_div.style.position = 'relative';
+            int_menu_div.style.zIndex = 1;
+            int_menu_div.style.left = 30;
+            int_menu_div.style.top = 30;
+            int_menu_div.style.display = "none";
+            document.body.appendChild(int_menu_div);
+        }
     }
 
     var panel = new Panel(canvas, div);

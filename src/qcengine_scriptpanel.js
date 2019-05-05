@@ -1108,6 +1108,7 @@ function QPU()
     var circle_div = qc_options.circle_div;
     var num_qubits = 4;
     var qReg  = new QReg(num_qubits);
+    qReg.activate();
     var staff_panel = createStaffPanel(qReg, 0, 0, staff_canvas, staff_div);
     var chart_panel = createChartPanel(qReg, 0, 0, circle_canvas, circle_div);
     var qc = new QScriptInterface(qReg);
