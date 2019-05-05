@@ -48,20 +48,39 @@ function make_sub_int(parent, name, sub_start, num_bits)
    new_qint.baseMask = 0;
    for (var i = 0; i < new_qint.numBits; ++i)
        new_qint.baseMask |= 1 << i;
-   new_qint.mask = new_qint.baseMask << new_qint.startBit;
    new_qint.maskBF = newShiftedMask(new_qint.baseMask, new_qint.startBit);
    new_qint.valid = true;
    return new_qint;
 }
 
-function QInt(numBits, qReg, name)
+function Qubits(numBits, name=null, qReg=null)
 {
+    // Arg flexibility: allow qreg to be passed in name slot
+    if (qReg == null && name && name.qReg)
+    {
+        qReg = name;
+        name = null;
+    }
+
     if (numBits == 0)
         return null;
-    
+ 
     numBits = 0|numBits;
     this.valid = false;            // true if this int is ready to use
     this.numBits = numBits;        // the number of bits in this integer
+
+    // Accept either "qc" or "qc.qReg" here
+    if (qReg.qReg)
+    {
+        this.qpu = qReg;
+        qReg = qReg.qReg;
+    }
+
+    // Handle the case where no name is passed in
+    this.auto_name_prefix = 'q';
+    if (this.qpu && !name)
+        name = this.auto_name_prefix + this.qpu.next_qint_serial_number();
+
     this.qReg = qReg;
     this.isUtil = false;
     if (name == '(util)')
@@ -90,7 +109,6 @@ function QInt(numBits, qReg, name)
                 this.baseMask = 0;
                 for (var i = 0; i < this.numBits; ++i)
                     this.baseMask |= 1 << i;
-                this.mask = this.baseMask << this.startBit;
                 this.maskBF = newShiftedMask(this.baseMask, this.startBit);
                 this.valid = true;
             }
@@ -105,7 +123,7 @@ function QInt(numBits, qReg, name)
         if (this.valid)
         {
             this.valid = false;
-            this.qReg.releaseBits(this.numBits);
+            this.qReg.releaseBits(this.numBits, this.startBit);
         }
     }
 
@@ -210,12 +228,14 @@ function QInt(numBits, qReg, name)
     // NOTE: this does a cnot between corresponding qubits in the qint.
     // It's useful for expanding programs to larger bytes.
     // Two qints of any size can be swapped with three of these.
-    this.cnot_core = function (op, conditionInt, mask, extraConditionBits, extraNOTConditionBits)
+    this.cnot_core = function (op, conditionInt, targ_mask, extraConditionBits, extraNOTConditionBits)
     {
         // Special simple common syntax
-        if (conditionInt && conditionInt.isBitField)
+        if (conditionInt && !is_qint(conditionInt))
         {
-            extraConditionBits = conditionInt;
+            // In this case, it's myint.cnot(target, cond)
+            extraConditionBits = this.bits(targ_mask);
+            targ_mask = conditionInt;
             conditionInt = null;
         }
         var anim = this.qReg.animateWidgets;
@@ -229,7 +249,7 @@ function QInt(numBits, qReg, name)
         }
 
         var condition = NewBitField(0, this.qReg.numQubits);
-        var baseTarget = (mask == null) ? this.baseMask : this.baseMask & mask;
+        var baseTarget = (targ_mask == null) ? this.baseMask : this.baseMask & targ_mask;
         if (!conditionInt)
         {
             condition.set(0);
@@ -299,6 +319,15 @@ function QInt(numBits, qReg, name)
     this.crootnot_inv = function (conditionInt, mask, extraConditionBits, extraNOTConditionBits)
         { this.cnot_core('crootnot_inv', conditionInt, mask, extraConditionBits, extraNOTConditionBits); }
 
+    this.rootx = function (mask)
+        { this.cnot_core('crootnot', null, mask, null, null); }
+    this.crootx = function (conditionInt, mask, extraConditionBits, extraNOTConditionBits)
+        { this.cnot_core('crootnot', conditionInt, mask, extraConditionBits, extraNOTConditionBits); }
+    this.rootx_inv = function (mask)
+        { this.cnot_core('crootnot_inv', null, mask, null, null); }
+    this.crootx_inv = function (conditionInt, mask, extraConditionBits, extraNOTConditionBits)
+        { this.cnot_core('crootnot_inv', conditionInt, mask, extraConditionBits, extraNOTConditionBits); }
+
     this.exchange_core = function (op, swapInt, baseMask, extraConditionBits, extraNOTConditionBits)
     {
         // convert any qint extra cond args to bitfields
@@ -365,6 +394,8 @@ function QInt(numBits, qReg, name)
     {
         this.exchange_core('exchange', swapInt, baseMask, extraConditionBits, extraNOTConditionBits);
     }
+    this.swap = this.exchange;
+    this.cswap = this.exchange;
 
     this.rootexchange = function (swapInt, baseMask, extraConditionBits, extraNOTConditionBits)
     {
@@ -375,6 +406,10 @@ function QInt(numBits, qReg, name)
     {
         this.exchange_core('rootexchange_inv', swapInt, baseMask, extraConditionBits, extraNOTConditionBits);
     }
+
+    this.y = function (mask, extraConditionBits)
+        { this.qpu.y(this.mask(mask)) }
+    this.cy = this.y;
 
     this.hadamard = function (mask, extraConditionBits)
     {
@@ -426,6 +461,7 @@ function QInt(numBits, qReg, name)
         if (extraNOTConditionBits)
             this.qReg.staff.addInstructionAfterInsertionPoint('not', extraNOTConditionBits, 0, 0);
     }
+    this.chad = this.chadamard; // more convenient
 
     this.beamsplitter = function (reflectivity, mask)
     {
@@ -500,7 +536,7 @@ function QInt(numBits, qReg, name)
         this.qReg.staff.addInstructionAfterInsertionPoint('polarization_grating_out', target, null, theta);
     }
 
-    this.phaseShift = function (thetaDegrees, mask, extraConditionBits, extraNOTConditionBits)
+    this.phase = function (thetaDegrees, targetMask, conditionMask, extraConditionBits, extraNOTConditionBits)
     {
         // convert any qint extra cond args to bitfields
         if (extraConditionBits && extraConditionBits.isQInt)
@@ -508,24 +544,105 @@ function QInt(numBits, qReg, name)
         if (extraNOTConditionBits && extraNOTConditionBits.isQInt)
             extraNOTConditionBits = extraNOTConditionBits.maskBF;
 
-        var baseCondition = (mask == null) ? this.baseMask : this.baseMask & mask;
+        var baseTarget = (targetMask == null) ? this.baseMask : this.baseMask & targetMask;
+        var baseCondition = (conditionMask == null) ? 0 : this.baseMask & conditionMask;
+        var target = newShiftedMask(baseTarget, this.startBit);
         var condition = newShiftedMask(baseCondition, this.startBit);
         if (extraNOTConditionBits)
             this.qReg.staff.addInstructionAfterInsertionPoint('not', extraNOTConditionBits, 0, 0);
         condition.orEquals(extraConditionBits);
         condition.orEquals(extraNOTConditionBits);
-        this.qReg.staff.addInstructionAfterInsertionPoint('phase', 0, condition, thetaDegrees);
+        this.qReg.staff.addInstructionAfterInsertionPoint('phase', target, condition, thetaDegrees);
         if (extraNOTConditionBits)
             this.qReg.staff.addInstructionAfterInsertionPoint('not', extraNOTConditionBits, 0, 0);
     }
-    this.phase = this.phaseShift;
 
-    this.cz = function (conditionInt, mask, extraConditionBits, extraNOTConditionBits)
+    this.cphase = function (thetaDegrees, condInt, targetMask, extraConditionBits, extraNOTConditionBits)
     {
-        var cond = conditionInt.bits();
-        cond.orEquals(extraConditionBits);
-        this.phase(180, mask, cond, extraNOTConditionBits);
+        // convert any qint extra cond args to bitfields
+        if (extraConditionBits && extraConditionBits.isQInt)
+            extraConditionBits = extraConditionBits.maskBF;
+        if (extraNOTConditionBits && extraNOTConditionBits.isQInt)
+            extraNOTConditionBits = extraNOTConditionBits.maskBF;
+
+        var baseTarget = (targetMask == null) ? this.baseMask : this.baseMask & targetMask;
+        var baseCondition = baseTarget & condInt.baseMask;
+        baseTarget &= baseCondition;
+        var targ_hi = getHighestBitIndex(baseTarget);
+        var targ_lo = getLowestBitIndex(baseTarget);
+        if (targ_lo != targ_hi)
+        {
+            // If we have multiple target qubits, run them as separate ops
+            for (var targ_bit = targ_lo; targ_bit <= targ_hi; ++targ_bit)
+            {
+                var tmask = 1 << targ_bit;
+                if (baseTarget & tmask)
+                    this.cphase(thetaDegrees, condInt, tmask, extraConditionBits, extraNOTConditionBits);
+            }
+            return;
+        }
+        var target = newShiftedMask(baseTarget, this.startBit);
+        var condition = newShiftedMask(baseCondition, condInt.startBit);
+        if (extraNOTConditionBits)
+            this.qReg.staff.addInstructionAfterInsertionPoint('not', extraNOTConditionBits, 0, 0);
+        condition.orEquals(extraConditionBits);
+        condition.orEquals(extraNOTConditionBits);
+        this.qReg.staff.addInstructionAfterInsertionPoint('phase', target, condition, thetaDegrees);
+        if (extraNOTConditionBits)
+            this.qReg.staff.addInstructionAfterInsertionPoint('not', extraNOTConditionBits, 0, 0);
     }
+
+    this.x = function (targetMask, conditionMask, extraConditionBits, extraNOTConditionBits)
+    {
+        this.not(targetMask, conditionMask, extraConditionBits, extraNOTConditionBits);
+    }
+    this.cx = function (targetMask, conditionMask, extraConditionBits, extraNOTConditionBits)
+    {
+        this.cnot(targetMask, conditionMask, extraConditionBits, extraNOTConditionBits);
+    }
+
+    this.z = function (targetMask, conditionMask, extraConditionBits, extraNOTConditionBits)
+    {
+        this.phase(180, targetMask, conditionMask, extraConditionBits, extraNOTConditionBits);
+    }
+    this.s = function (targetMask, conditionMask, extraConditionBits, extraNOTConditionBits)
+    {
+        this.phase(90, targetMask, conditionMask, extraConditionBits, extraNOTConditionBits);
+    }
+    this.t = function (targetMask, conditionMask, extraConditionBits, extraNOTConditionBits)
+    {
+        this.phase(45, targetMask, conditionMask, extraConditionBits, extraNOTConditionBits);
+    }
+    this.s_inv = function (targetMask, conditionMask, extraConditionBits, extraNOTConditionBits)
+    {
+        this.phase(-90, targetMask, conditionMask, extraConditionBits, extraNOTConditionBits);
+    }
+    this.t_inv = function (targetMask, conditionMask, extraConditionBits, extraNOTConditionBits)
+    {
+        this.phase(-45, targetMask, conditionMask, extraConditionBits, extraNOTConditionBits);
+    }
+
+    this.cz = function (condInt, targetMask, extraConditionBits, extraNOTConditionBits)
+    {
+        this.cphase(180, condInt, targetMask, extraConditionBits, extraNOTConditionBits);
+    }
+    this.cs = function (condInt, targetMask, extraConditionBits, extraNOTConditionBits)
+    {
+        this.cphase(90, condInt, targetMask, extraConditionBits, extraNOTConditionBits);
+    }
+    this.ct = function (condInt, targetMask, extraConditionBits, extraNOTConditionBits)
+    {
+        this.cphase(45, condInt, targetMask, extraConditionBits, extraNOTConditionBits);
+    }
+    this.cs_inv = function (condInt, targetMask, extraConditionBits, extraNOTConditionBits)
+    {
+        this.cphase(-90, condInt, targetMask, extraConditionBits, extraNOTConditionBits);
+    }
+    this.ct_inv = function (condInt, targetMask, extraConditionBits, extraNOTConditionBits)
+    {
+        this.cphase(-45, condInt, targetMask, extraConditionBits, extraNOTConditionBits);
+    }
+
 
 /*
     this.rootnot = function (mask)
@@ -553,7 +670,7 @@ function QInt(numBits, qReg, name)
         }
         var baseTarget = (mask == null) ? this.baseMask : this.baseMask & mask;
         var target = newShiftedMask(baseTarget, this.startBit);
-        this.qReg.staff.addInstructionAfterInsertionPoint('crotatex', target, cond, thetaDegrees);
+        this.qpu.rx(thetaDegrees, target, cond);
     }
 
     this.rotatey = function (thetaDegrees, mask, cond)
@@ -567,7 +684,7 @@ function QInt(numBits, qReg, name)
         }
         var baseTarget = (mask == null) ? this.baseMask : this.baseMask & mask;
         var target = newShiftedMask(baseTarget, this.startBit);
-        this.qReg.staff.addInstructionAfterInsertionPoint('crotatey', target, cond, thetaDegrees);
+        this.qpu.ry(thetaDegrees, target, cond);
     }
 
     this.rotatez = function (thetaDegrees, mask, cond)
@@ -577,18 +694,26 @@ function QInt(numBits, qReg, name)
             // Special syntax similar to cnot, arg is another int
             // TODO: replace this with CNOT core
             cond = mask.maskBF;
-            mask = null;
         }
         var baseTarget = (mask == null) ? this.baseMask : this.baseMask & mask;
         var target = newShiftedMask(baseTarget, this.startBit);
         target.orEquals(cond);
-        this.qReg.staff.addInstructionAfterInsertionPoint('phase', null, target, thetaDegrees);
+        this.qpu.rz(thetaDegrees, target, cond);
     }
 
     this.rotate = this.rotatex;
     this.rotx = this.rotatex;
     this.roty = this.rotatey;
     this.rotz = this.rotatez;
+    this.rx = this.rotatex;
+    this.ry = this.rotatey;
+    this.rz = this.rotatez;
+    this.crx = this.rotatex;
+    this.cry = this.rotatey;
+    this.crz = this.rotatez;
+    this.crotatex = this.rotatex;
+    this.crotatey = this.rotatey;
+    this.crotatez = this.rotatez;
 
     this.teleport_send = function (entangle_qubit)
     {
@@ -624,6 +749,7 @@ function QInt(numBits, qReg, name)
         rval.recycle();
         return result;
     }
+    this.read_uint = this.read;
 
     this.postselect = function (value, mask)
     {
@@ -682,6 +808,14 @@ function QInt(numBits, qReg, name)
         return out_mask;
     }
 
+    // Just return a shifted bitmask to use as args
+    this.mask = function (mask)
+    {
+        var baseTarget = (mask == null) ? this.baseMask : this.baseMask & mask;
+        var out_mask = newShiftedMask(baseTarget, this.startBit);
+        return bitFieldToInt(out_mask);
+    }
+
     // Read and then sign-extend
     this.readSigned = function ()
     {
@@ -723,7 +857,7 @@ function QInt(numBits, qReg, name)
             for (bit2 = bit1 + 1; bit2 < this.numBits; ++bit2)
             {
                 var mask2 = 1 << bit2;
-                this.phaseShift(theta, mask1 + mask2);
+                this.phase(theta, 0, mask1|mask2);
                 theta *= 2.0;
             }
         }
@@ -737,53 +871,28 @@ function QInt(numBits, qReg, name)
             for (bit2 = this.numBits - 1; bit2 >= bit1 + 1; --bit2)
             {
                 var mask2 = 1 << bit2;
-                this.phaseShift(theta, mask1 + mask2);
+                this.phase(theta, 0, mask1|mask2);
                 theta *= 0.5;
             }
             this.hadamard(mask1);
         }
     }
 
-    this.invQFT = function()
+    this.invQFT = function(target_mask=~0)
     {
-        var bits = this.numBits;
-        for (var i = 0; i < bits; ++i)
-        {
-            var bit1 = bits - (i + 1);
-            var mask1 = 1 << bit1;
-            this.hadamard(mask1);
-            var theta = -90.0;
-            for (var j = i + 1; j < bits; ++j)
-            {
-                var bit2 = bits - (j + 1);
-                var mask2 = 1 << bit2;
-                this.phaseShift(theta, mask1 + mask2);
-                theta *= 0.5;
-            }
-        }
+        this.QFT(target_mask, true)
     }
 
-    this.QFT = function()
+    this.QFT = function(target_mask=~0, flip_h=false)
     {
-        for (bit1 = 0; bit1 < this.numBits; ++bit1)
-        {
-            var mask1 = 1 << bit1;
-            var theta = 90.0;
-            this.hadamard(mask1);
-            for (bit2 = bit1 + 1; bit2 < this.numBits; ++bit2)
-            {
-                var mask2 = 1 << bit2;
-                this.phaseShift(theta, mask1 + mask2);
-                theta *= 0.5;
-            }
-        }
+        this.qReg.qpu.QFT(this.mask(target_mask), flip_h);
     }
 
     this.Grover = function(conditionMask)
     {
         this.hadamard();
         this.not();
-        this.phase(180, ~0, conditionMask);
+        this.phase(180, 0, ~0, conditionMask);
         this.not();
         this.hadamard();
     }
@@ -1140,6 +1249,56 @@ function QInt(numBits, qReg, name)
     this.reserve();
 }
 
+function QUInt(numBits, qReg, name)
+{
+    Qubits.call( this, numBits, qReg, name);
+}
+
+function QInt(numBits, qReg, name)
+{
+    QUInt.call( this, numBits, qReg, name);
+
+    this.read = function (mask)
+    {
+        var result = this.read_uint(mask);
+
+        // Now make it signed
+        high_bit = 1 << (this.numBits - 1)
+        if (result & high_bit)
+        {
+            // sign-extend
+            result |= (-1 << this.numBits);
+        }
+        return result;
+    }
+    this.read_int = this.read;
+    this.write_int = this.write;
+}
+
+function QFixed(numBits, radix, qReg, name)
+{
+    QInt.call( this, numBits, qReg, name);
+    this.radix = radix;
+
+    this.read = function (mask)
+    {
+        var value = this.read_int(mask);
+        value /= (1.0 * (1 << this.radix));
+        return value;
+    }
+    this.write = function (value, mask)
+    {
+        value = 0|(value * (1 << this.radix))
+        this.write_int(value, mask);
+    }
+}
+
+function is_qint(value)
+{
+    // Check to see if a variable is a qint (otherwise it's likely a bitfield or an integer)
+    return value != null && value.startBit != null;
+}
+
 // Given an array of qints and masks, return a bitfield which is a combined mask.
 // Input is like this:
 //    qintBits([intA, maskA, intB, maskB, ...]);
@@ -1162,4 +1321,8 @@ function qintMask(list)
 }
 
 // Node.js hookups
+module.exports.is_qint = is_qint;
+module.exports.Qubits = Qubits;
 module.exports.QInt = QInt;
+module.exports.QUInt = QUInt;
+module.exports.QFixed = QFixed;

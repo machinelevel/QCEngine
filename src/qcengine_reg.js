@@ -304,7 +304,7 @@ function QNullBlock(numQubits, qReg)
       this.not(targetQubit);
   }
 
-  this.phaseShift = function (conditionQubits, sval, cval) {}
+  this._phaseShift = function (conditionQubits, sval, cval) {}
   this.op2x2 = function (targetQubit, opFunc, opData, pairBranch) {}
   this.cop2x2 = function (targetQubit, conditionQubits, opFunc, opData, pairBranch)
   {
@@ -431,19 +431,6 @@ function QReg(numQubits, numBlockQubits, doublePrecision)
         if (!webgl_blocks.side_by_side_checking)  // Don't need CPU blocks if we're all GPU
           this.noCPUBlocks = true;
       }
-/* Delete this, I think.
-      {
-        var targetQubit = 1;
-        var rowBytes = targetQubit * 2 * this.bytesPerFloat;
-        var width = rowBytes >> 2;
-        var height = this.bytesPerBlock / rowBytes;
-        if (this.blockCanvas == null)
-          this.blockCanvas = document.createElement('canvas');
-        this.blockCanvas.width = width;
-        this.blockCanvas.height = height;
-        this.blockCtx = this.blockCanvas.getContext("2d");
-      }
-*/
 
       if (enableMonolithicArray && !this.noCPUBlocks)
       {

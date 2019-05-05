@@ -567,7 +567,7 @@ QReg.prototype.apply_noise = function (noiseMagnitude, targetQubits, noiseFunc)
                 {
                     var phaseMag = noiseMagnitude * (2 * Math.random() - 1);
                     max_noise = Math.max(max_noise, Math.abs(phaseMag));
-                    this.phaseShift(bf, 180 * phaseMag);
+                    this.single_qubit_phase(bf, 180 * phaseMag);
 
                     var xmag = noiseMagnitude * (2 * Math.random() - 1);
                     max_noise = Math.max(max_noise, Math.abs(xmag));
@@ -611,12 +611,27 @@ QReg.prototype.noise = function (noiseMagnitude, targetQubits, noiseFunc)
     qc_options.noise_probability = save_noise_prob;
 }
 
+
+QReg.prototype.single_qubit_phase = function (targetQubits, phiDegrees)
+{
+    this._phaseShift(targetQubits, 0, phiDegrees);
+}
+
+QReg.prototype.multi_qubit_phase = function (targetQubits, conditionQubits, phiDegrees)
+{
+    this._phaseShift(targetQubits, conditionQubits, phiDegrees);
+}
+
 //////////////////////////////////////////////////////////////
 // Phase Shift
-// This is a special case because it uses only condition bits,
-// no target bit.
+// New new new API change:
+// This now operates more like CNOT.
+// If conditionQubits is 0, then this is a single-qubit phase on each qubit in targetQubits.
+// If conditionQubits is not 0, then this is a cphase on each qubit in targetQubits, with all conditionQubits.
+// If targetQubits is 0 and conditionQubits is not 0, then this is a cphase on conditionQubits
+// If targetQubits and conditionQubits are 0, then this is a single-qubit phase on all qubits
 
-QReg.prototype.phaseShift = function (conditionQubits, phiDegrees)
+QReg.prototype._phaseShift = function (targetQubits, conditionQubits, phiDegrees)
 {
     // Handle mixed-state callthrough
     if (this.current_mix)
@@ -624,7 +639,7 @@ QReg.prototype.phaseShift = function (conditionQubits, phiDegrees)
         for (var m = 0; m < this.mixed_states.length; ++m)
         {
             var mix = this.mixed_states[m];
-            mix.reg.phaseShift(conditionQubits, phiDegrees);
+            mix.reg._phaseShift(targetQubits, conditionQubits, phiDegrees);
         }
         this.mergeMixedStates();
         this.changed();
@@ -633,13 +648,53 @@ QReg.prototype.phaseShift = function (conditionQubits, phiDegrees)
     // TODO: Try speed with float view vs. int view into the data.
     if (phiDegrees == 0)
         return;
-    if (conditionQubits == null)	// this allows a missing arg to just affect the whole reg
-        conditionQubits = this.allBitsMask;
-    if (isAllZero(conditionQubits))
+
+    if (conditionQubits == null)
+        conditionQubits = 0;
+    if (targetQubits == null)
+        targetQubits = 0;
+    var zerot = isAllZero(targetQubits);
+    var zeroc = isAllZero(conditionQubits);
+
+    if (zerot && zeroc)
+    {
+        // t=0 c=0: single-qubit phase on all qubits
+        targetQubits = this.allBitsMask;
+    }
+
+    // TODO: Add bitfield support to the rest of this
+    //       For now it's not needed, since we're full-sim, so the QC size will be <= 32 bits
+    conditionQubits = bitFieldToInt(conditionQubits);
+    targetQubits = bitFieldToInt(targetQubits);
+
+    // In the case where we have MULTIPLE target qubits, separate them and
+    // run them separately.
+    // In all other cases, just merge the qubits into condition.
+    var targ_lo = getLowestBitIndex(targetQubits);
+    var targ_hi = getHighestBitIndex(targetQubits);
+    if (targ_lo != targ_hi)
+    {
+        // In the case where we have MULTIPLE target qubits, separate them and
+        // run them separately.
+        for (var bit = targ_lo; bit <= targ_hi; ++bit)
+        {
+            var targ_mask = 1 << bit;
+            if (targetQubits & targ_mask)
+                this._phaseShift(targ_mask, conditionQubits & ~targ_mask, phiDegrees);
+        }
         return;
+    }
+    else
+    {
+        // In all other cases, just merge the qubits into condition.
+        conditionQubits |= targetQubits;
+        targetQubits = 0;
+    }
 
     if (this.chp && this.chp.active)
     {
+        // TODO: fix CHP handling
+        conditionQubits.orEquals(targetQubits);
         if (conditionQubits.countOneBits() == 1)
         {
             var phi = phiDegrees;
@@ -665,7 +720,7 @@ QReg.prototype.phaseShift = function (conditionQubits, phiDegrees)
 
     if (this.disableSimulation)
     {
-        this.storage.phaseShift(conditionQubits, phiDegrees);
+        this.storage._phaseShift(conditionQubits, phiDegrees);
         this.changed();
         return;
     }
@@ -685,7 +740,7 @@ QReg.prototype.phaseShift = function (conditionQubits, phiDegrees)
     var phiRadians = phiDegrees * Math.PI / 180.0;
     var sval = Math.sin(phiRadians);
     var cval = Math.cos(phiRadians);
-    this.storage.phaseShift(conditionQubits, sval, cval);
+    this.storage._phaseShift(conditionQubits, sval, cval);
 
     if (qc_options.noise_probability)
         this.apply_noise(qc_options.noise_magnitude, conditionQubits, qc_options.noise_func);
@@ -694,22 +749,22 @@ QReg.prototype.phaseShift = function (conditionQubits, phiDegrees)
     this.changed();
 }
 
-QRegNode.prototype.phaseShift = function (conditionQubits, sval, cval)
+QRegNode.prototype._phaseShift = function (conditionQubits, sval, cval)
 {
     if (conditionQubits & this.bitValue)
     {
         // If the top bit is a condition, then only continue down one branch.
-        this.tree[1].phaseShift(conditionQubits & this.kidMask, sval, cval);
+        this.tree[1]._phaseShift(conditionQubits & this.kidMask, sval, cval);
     }
     else
     {
         // If this bit isn't used, just keep calling down the chain.
-        this.tree[0].phaseShift(conditionQubits & this.kidMask, sval, cval);
-        this.tree[1].phaseShift(conditionQubits & this.kidMask, sval, cval);
+        this.tree[0]._phaseShift(conditionQubits & this.kidMask, sval, cval);
+        this.tree[1]._phaseShift(conditionQubits & this.kidMask, sval, cval);
     }
 }
 
-QBlock.prototype.phaseShift = function (conditionQubits, sval, cval)
+QBlock.prototype._phaseShift = function (conditionQubits, sval, cval)
 {
     if (this.gpuBlock)
     {
@@ -1582,12 +1637,11 @@ QReg.prototype.rotatex = function (targetQubits, thetaDegrees)
     if (targetQubits == null)	// this allows a missing arg to just affect the whole reg
         targetQubits = this.allBitsMask;
     var thetaRadians = thetaDegrees * Math.PI / 180.0;
-    var sval = Math.sin(thetaRadians);
-    var cval = Math.cos(thetaRadians);
-    // TODO: Fill this in for the GPU op
-    var mtx2x2 = [[{real: 0.0, imag: 0.0}, {real: 0.0, imag: 0.0}],
-                  [{real: 0.0, imag: 0.0}, {real: 0.0, imag: 0.0}]];
-    this.op2x2(targetQubits, blockOp_Rotatex, [sval, cval], mtx2x2);
+    var sval = Math.sin(0.5 * thetaRadians);
+    var cval = Math.cos(0.5 * thetaRadians);
+    var mtx2x2 = [[{real: cval, imag:  0.0},  {real: 0.0,  imag: -sval}],
+                  [{real: 0.0,  imag: -sval}, {real: cval, imag:  0.0}]];
+    this.op2x2(targetQubits, blockOp_2x2, mtx2x2, mtx2x2);
 }
 
 QReg.prototype.crotatex = function (targetQubits, conditionQubits, thetaDegrees)
@@ -1605,15 +1659,22 @@ QReg.prototype.crotatex = function (targetQubits, conditionQubits, thetaDegrees)
         return;
     }
     var thetaRadians = thetaDegrees * Math.PI / 180.0;
-    var sval = Math.sin(thetaRadians);
-    var cval = Math.cos(thetaRadians);
-    // TODO: Fill this in for the GPU op
-    var mtx2x2 = [[{real: 0.0, imag: 0.0}, {real: 0.0, imag: 0.0}],
-                  [{real: 0.0, imag: 0.0}, {real: 0.0, imag: 0.0}]];
-    this.cop2x2(targetQubits, conditionQubits, blockOp_Rotatex, [sval, cval], mtx2x2);
+    var sval = Math.sin(0.5 * thetaRadians);
+    var cval = Math.cos(0.5 * thetaRadians);
+    var mtx2x2 = [[{real: cval, imag:  0.0},  {real: 0.0,  imag: -sval}],
+                  [{real: 0.0,  imag: -sval}, {real: cval, imag:  0.0}]];
+    this.cop2x2(targetQubits, conditionQubits, blockOp_2x2, mtx2x2, mtx2x2);
 }
-QReg.prototype.rotate = QReg.prototype.rotatex;
-QReg.prototype.crotate = QReg.prototype.crotatex;
+
+QReg.prototype.y = function (targetQubits, thetaDegrees)
+{
+    // TODO: This can be done without multiplication, similar to x()     
+    if (targetQubits == null)   // this allows a missing arg to just affect the whole reg
+        targetQubits = this.allBitsMask;
+    var mtx2x2 = [[{real: 0.0, imag: 0.0}, {real: 0.0, imag: -1.0}],
+                  [{real: 0.0, imag: 1.0}, {real: 0.0, imag: 0.0}]];
+    this.op2x2(targetQubits, blockOp_2x2, mtx2x2, mtx2x2);
+}
 
 QReg.prototype.rotatey = function (targetQubits, thetaDegrees)
 {
@@ -1632,12 +1693,12 @@ QReg.prototype.rotatey = function (targetQubits, thetaDegrees)
     if (targetQubits == null)   // this allows a missing arg to just affect the whole reg
         targetQubits = this.allBitsMask;
     var thetaRadians = thetaDegrees * Math.PI / 180.0;
-    var sval = Math.sin(thetaRadians);
-    var cval = Math.cos(thetaRadians);
+    var sval = Math.sin(0.5 * thetaRadians);
+    var cval = Math.cos(0.5 * thetaRadians);
     // TODO: Fill this in for the GPU op
-    var mtx2x2 = [[{real: 0.0, imag: 0.0}, {real: 0.0, imag: 0.0}],
-                  [{real: 0.0, imag: 0.0}, {real: 0.0, imag: 0.0}]];
-    this.op2x2(targetQubits, blockOp_Rotatey, [sval, cval], mtx2x2);
+    var mtx2x2 = [[{real: cval, imag: 0.0}, {real: -sval, imag: 0.0}],
+                  [{real: sval, imag: 0.0}, {real:  cval, imag: 0.0}]];
+    this.op2x2(targetQubits, blockOp_2x2, mtx2x2, mtx2x2);
 }
 
 QReg.prototype.crotatey = function (targetQubits, conditionQubits, thetaDegrees)
@@ -1655,12 +1716,60 @@ QReg.prototype.crotatey = function (targetQubits, conditionQubits, thetaDegrees)
         return;
     }
     var thetaRadians = thetaDegrees * Math.PI / 180.0;
-    var sval = Math.sin(thetaRadians);
-    var cval = Math.cos(thetaRadians);
+    var sval = Math.sin(0.5 * thetaRadians);
+    var cval = Math.cos(0.5 * thetaRadians);
     // TODO: Fill this in for the GPU op
-    var mtx2x2 = [[{real: 0.0, imag: 0.0}, {real: 0.0, imag: 0.0}],
-                  [{real: 0.0, imag: 0.0}, {real: 0.0, imag: 0.0}]];
-    this.cop2x2(targetQubits, conditionQubits, blockOp_Rotatey, [sval, cval], mtx2x2);
+    var mtx2x2 = [[{real: cval, imag: 0.0}, {real: -sval, imag: 0.0}],
+                  [{real: sval, imag: 0.0}, {real:  cval, imag: 0.0}]];
+    this.cop2x2(targetQubits, conditionQubits, blockOp_2x2, mtx2x2, mtx2x2);
+}
+
+QReg.prototype.rotatez = function (targetQubits, thetaDegrees)
+{
+    // Handle mixed-state callthrough
+    if (this.current_mix)
+    {
+        for (var m = 0; m < this.mixed_states.length; ++m)
+        {
+            var mix = this.mixed_states[m];
+            mix.reg.rotatey(targetQubits, thetaDegrees);
+        }
+        this.mergeMixedStates();
+        this.changed();
+        return;
+    }
+    if (targetQubits == null)   // this allows a missing arg to just affect the whole reg
+        targetQubits = this.allBitsMask;
+    var thetaRadians = thetaDegrees * Math.PI / 180.0;
+    var sval = Math.sin(0.5 * thetaRadians);
+    var cval = Math.cos(0.5 * thetaRadians);
+    // TODO: Fill this in for the GPU op
+    var mtx2x2 = [[{real: cval, imag: -sval}, {real:   0.0, imag:  0.0}],
+                  [{real: 0.0,  imag:   0.0}, {real:  cval, imag: sval}]];
+    this.op2x2(targetQubits, blockOp_2x2, mtx2x2, mtx2x2);
+}
+
+QReg.prototype.crotatez = function (targetQubits, conditionQubits, thetaDegrees)
+{
+    // Handle mixed-state callthrough
+    if (this.current_mix)
+    {
+        for (var m = 0; m < this.mixed_states.length; ++m)
+        {
+            var mix = this.mixed_states[m];
+            mix.reg.crotatey(targetQubits, conditionQubits, thetaDegrees);
+        }
+        this.mergeMixedStates();
+        this.changed();
+        return;
+    }
+    var thetaRadians = thetaDegrees * Math.PI / 180.0;
+    var sval = Math.sin(0.5 * thetaRadians);
+    var cval = Math.cos(0.5 * thetaRadians);
+    // TODO: Fill this in for the GPU op
+    var mtx2x2 = [[{real: cval, imag: -sval}, {real:   0.0, imag:  0.0}],
+                  [{real: 0.0,  imag:   0.0}, {real:  cval, imag: sval}]];
+    this.cop2x2(targetQubits, conditionQubits, blockOp_2x2, mtx2x2, mtx2x2);
 }
 
 //////////////////////////////////////////////////////////////
@@ -2236,10 +2345,147 @@ QReg.prototype.printState = function(message, start, count)
     {
         var val = this.peekComplexValue(i);
         if (val.x != 0 || val.y != 0)
-            str += '[' + i + ']=' + val.x.toFixed(6) + ',' + val.y.toFixed(6) + ' ';
+            str += '|' + i + '> = ' + val.x.toFixed(6) + ',' + val.y.toFixed(6) + ' ';
     }
+    qc.print(str);
     console.log(str);
 }
+
+QReg.prototype.printStateToString = function(message, start, count)
+{
+    if (message == null)
+        message = '';
+    if (start == null)
+        start = 0;
+    if (count == null)
+        count = 1 << this.numQubits;
+    var str = 'QReg: ' + message + '\n';
+    for (var i = start; i < count; ++i)
+    {
+        var val = this.peekComplexValue(i);
+        if (val.x != 0 || val.y != 0)
+            str += '|' + i + '> = ' + val.x.toFixed(6) + ',' + val.y.toFixed(6) + '\n';
+    }
+    return str;
+}
+
+QReg.prototype.pull_state = function ()
+{
+    var out_array;
+    if (this.doublePrecision)
+        out_array = new Float64Array(new ArrayBuffer(2 * this.numValues * this.bytesPerFloat));
+    else
+        out_array = new Float32Array(new ArrayBuffer(2 * this.numValues * this.bytesPerFloat));
+    for (var i = 0; i < this.numValues; ++i)
+    {
+        var value = this.storage.peekComplexValue(i);
+        out_array[i * 2] = value.x;
+        out_array[i * 2 + 1] = value.y;
+    }
+    return out_array;
+}
+
+QReg.prototype.push_state = function (new_values, normalize=true)
+{
+    var expected_terms = this.numValues;
+    var actual_terms = new_values.length;
+    if (actual_terms == expected_terms)
+    {
+        if (new_values[0].length == 2)
+        {
+            // These are in the form [[re, im], [re, im], ...]
+            for (var i = 0; i < this.numValues; ++i)
+                this.storage.pokeComplexValue(i, new_values[i][0], new_values[i][1]);
+        }
+        else
+        {
+            // These are in the form [re, re, re, re, ...]
+            for (var i = 0; i < this.numValues; ++i)
+                this.storage.pokeComplexValue(i, new_values[i], 0);
+        }
+    }
+    if (actual_terms == 2 * expected_terms)
+    {
+        // These are in the form [re, im, re, im, ...]
+        for (var i = 0; i < this.numValues; ++i)
+            this.storage.pokeComplexValue(i, new_values[i * 2], new_values[i * 2 + 1]);
+    }
+    if (normalize)
+        this.renormalize();
+}
+
+QReg.prototype.check_state = function (check_values, epsilon=0.000001)
+{
+    var expected_terms = this.numValues;
+    var actual_terms = check_values.length;
+    if (actual_terms == expected_terms)
+    {
+        if (check_values[0].length == 2)
+        {
+            // These are in the form [[re, im], [re, im], ...]
+            for (var i = 0; i < this.numValues; ++i)
+            {
+                var value = this.storage.peekComplexValue(i);
+                var x = check_values[i][0];
+                var y = check_values[i][1];
+                if (Math.abs(value.x - x) > epsilon || Math.abs(value.y - y) > epsilon)
+                    return false;
+            }
+        }
+        else
+        {
+            // These are in the form [re, re, re, re, ...]
+            for (var i = 0; i < this.numValues; ++i)
+            {
+                var value = this.storage.peekComplexValue(i);
+                var x = check_values[i];
+                var y = 0.0;
+                if (Math.abs(value.x - x) > epsilon || Math.abs(value.y - y) > epsilon)
+                    return false;
+            }
+        }
+    }
+    if (actual_terms == 2 * expected_terms)
+    {
+        // These are in the form [re, im, re, im, ...]
+        for (var i = 0; i < this.numValues; ++i)
+        {
+            var value = this.storage.peekComplexValue(i);
+            var x = check_values[i * 2];
+            var y = check_values[i * 2 + 1];
+            if (Math.abs(value.x - x) > epsilon || Math.abs(value.y - y) > epsilon)
+                return false;
+        }
+    }
+    return true;
+}
+
+
+QReg.prototype.print_state_vector_to_string = function (line=-1, min_value_to_print=0.000000001, max_num_values=1000)
+{
+    var output = "";
+    if (line >= 0)
+        output += 'State vector at line '+line+':\n';
+    else
+        output += 'State vector:\n';
+    var num_values_printed = 0;
+    for (var i = 0; i < this.numValues; ++i)
+    {
+        var value = this.storage.peekComplexValue(i);
+        if (min_value_to_print <= 0.0 || Math.abs(value.x) >= min_value_to_print || Math.abs(value.y) >= min_value_to_print)
+        {
+            output += '|'+i+'&rangle; ('+value.x+', '+value.y+')\n';
+            num_values_printed++;
+            if (num_values_printed > max_num_values)
+            {
+                output += '...output truncated to '+max_num_values+' values.\n';
+                break;                
+            }
+        }
+    }
+    return output;
+}
+
 
 // WARNING: This makes a complete copy of the probabilities for all values.
 // With a large number of qubits, this will fail, or at least be very slow.
