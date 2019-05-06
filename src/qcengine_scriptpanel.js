@@ -96,7 +96,7 @@ function QScriptInterface(qReg)
     {
         if (numBits == 0)
             return null;
-        var theInt = new QInt(numBits, name, qReg);
+        var theInt = new QInt(numBits, name, qReg.qpu);
         if (!theInt.valid)
             return null;
         this[name] = theInt;
