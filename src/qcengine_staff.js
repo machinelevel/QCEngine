@@ -43,7 +43,7 @@ var qc_options = {
     print_function:     null,
     max_staff_width:    1024,
     max_staff_height:   1024,
-    draw_s_t_gates:     false,
+    draw_s_t_z_gates:   false,
 };    // A general bucket for collecting global options
 
 
@@ -271,7 +271,7 @@ function QInstruction(op, targetQubits, conditionQubits, theta, codeLabel, auxQu
 
         if (this.op == 'phase' || this.op == 'cphase')
         {
-            if (this.theta == 180)
+            if (this.theta == 180 && qc_options.draw_s_t_z_gates)
             {
                 // Z gate
                 ctx.lineWidth = 1;
@@ -289,7 +289,7 @@ function QInstruction(op, targetQubits, conditionQubits, theta, codeLabel, auxQu
                 ctx.lineTo(x + hradx, y + hrady);
                 ctx.stroke();
             }
-            else if ((this.theta == 90 || this.theta == -90) && qc_options.draw_s_t_gates)
+            else if ((this.theta == 90 || this.theta == -90) && qc_options.draw_s_t_z_gates)
             {
                 // S gate
                 ctx.lineWidth = 1;
@@ -321,7 +321,7 @@ function QInstruction(op, targetQubits, conditionQubits, theta, codeLabel, auxQu
                 ctx.lineTo(x - hradx, y + hrady);
                 ctx.stroke();
             }
-            else if ((this.theta == 45 || this.theta == -45) && qc_options.draw_s_t_gates)
+            else if ((this.theta == 45 || this.theta == -45) && qc_options.draw_s_t_z_gates)
             {
                 // T gate
                 ctx.lineWidth = 1;
@@ -2247,9 +2247,12 @@ function QStaff(qReg, qPanel, pos)
                                 // No label for a simple CZ
 //                                if (instruction.conditionQubits.countOneBits() > 1)
                                 {
-                                    if (instruction.theta == 180.0
-                                        || (instruction.theta == 90.0 && qc_options.draw_s_t_gates)
-                                        || (instruction.theta == 45.0 && qc_options.draw_s_t_gates))
+                                    if ((instruction.theta == 180.0 && qc_options.draw_s_t_z_gates)
+                                        || (instruction.theta == 90.0 && qc_options.draw_s_t_z_gates)
+                                        || (instruction.theta == -90.0 && qc_options.draw_s_t_z_gates)
+                                        || (instruction.theta == 45.0 && qc_options.draw_s_t_z_gates)
+                                        || (instruction.theta == -45.0 && qc_options.draw_s_t_z_gates)
+                                        )
                                         special_phase = true;
                                 }
                             }
@@ -2298,7 +2301,7 @@ function QStaff(qReg, qPanel, pos)
                             else if ((instruction.theta == 45.0 ||
                                 instruction.theta == -45.0 ||
                                 instruction.theta == 90.0 ||
-                                instruction.theta == -90.0) && qc_options.draw_s_t_gates)
+                                instruction.theta == -90.0) && qc_options.draw_s_t_z_gates)
                             {
                                 if (is_targ || num_targ == 0)
                                     do_large_phase_marker = true;
@@ -2394,7 +2397,7 @@ function QStaff(qReg, qPanel, pos)
                                     cz_dots = true;
                             }
                             else if ((instruction.theta == 45.0 || instruction.theta == -45.0
-                                    || instruction.theta == 90.0 || instruction.theta == -90.0) && qc_options.draw_s_t_gates)
+                                    || instruction.theta == 90.0 || instruction.theta == -90.0) && qc_options.draw_s_t_z_gates)
                             {
                                 // if there's at least one target
                                 if (num_targ > 0)
