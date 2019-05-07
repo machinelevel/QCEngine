@@ -557,9 +557,45 @@ function Qubits(numBits, name=null, qReg=null)
             this.qReg.staff.addInstructionAfterInsertionPoint('not', extraNOTConditionBits, 0, 0);
     }
 
+
+    this.cphase_intarg = function (thetaDegrees, condInt, targetMask, extraConditionBits, extraNOTConditionBits)
+    {
+        // convert any qint extra cond args to bitfields
+        if (extraConditionBits && extraConditionBits.isQInt)
+            extraConditionBits = extraConditionBits.maskBF;
+        if (extraNOTConditionBits && extraNOTConditionBits.isQInt)
+            extraNOTConditionBits = extraNOTConditionBits.maskBF;
+
+        var baseTarget = (targetMask == null) ? this.baseMask : this.baseMask & targetMask;
+        var baseCondition = baseTarget & condInt.baseMask;
+        baseTarget &= baseCondition;
+        var targ_hi = getHighestBitIndex(baseTarget);
+        var targ_lo = getLowestBitIndex(baseTarget);
+        if (targ_lo != targ_hi)
+        {
+            // If we have multiple target qubits, run them as separate ops
+            for (var targ_bit = targ_lo; targ_bit <= targ_hi; ++targ_bit)
+            {
+                var tmask = 1 << targ_bit;
+                if (baseTarget & tmask)
+                    this.cphase(thetaDegrees, condInt, tmask, extraConditionBits, extraNOTConditionBits);
+            }
+            return;
+        }
+        var target = newShiftedMask(baseTarget, this.startBit);
+        var condition = newShiftedMask(baseCondition, condInt.startBit);
+        if (extraNOTConditionBits)
+            this.qReg.staff.addInstructionAfterInsertionPoint('not', extraNOTConditionBits, 0, 0);
+        condition.orEquals(extraConditionBits);
+        condition.orEquals(extraNOTConditionBits);
+        this.qReg.staff.addInstructionAfterInsertionPoint('phase', target, condition, thetaDegrees);
+        if (extraNOTConditionBits)
+            this.qReg.staff.addInstructionAfterInsertionPoint('not', extraNOTConditionBits, 0, 0);
+    }
+
     this.cphase = function (thetaDegrees, targetMask=~0, extraConditionBits=0)
     {
-        this.qreg.cphase(thetaDegrees, this.bits(target_mask, extraConditionBits));
+        this.qpu.cphase(thetaDegrees, this.bits(targetMask, extraConditionBits));
     }
 
     this.x = function (targetMask, conditionMask, extraConditionBits, extraNOTConditionBits)
@@ -594,23 +630,23 @@ function Qubits(numBits, name=null, qReg=null)
 
     this.cz = function (condInt, targetMask, extraConditionBits, extraNOTConditionBits)
     {
-        this.cphase(180, condInt, targetMask, extraConditionBits, extraNOTConditionBits);
+        this.cphase_intarg(180, condInt, targetMask, extraConditionBits, extraNOTConditionBits);
     }
     this.cs = function (condInt, targetMask, extraConditionBits, extraNOTConditionBits)
     {
-        this.cphase(90, condInt, targetMask, extraConditionBits, extraNOTConditionBits);
+        this.cphase_intarg(90, condInt, targetMask, extraConditionBits, extraNOTConditionBits);
     }
     this.ct = function (condInt, targetMask, extraConditionBits, extraNOTConditionBits)
     {
-        this.cphase(45, condInt, targetMask, extraConditionBits, extraNOTConditionBits);
+        this.cphase_intarg(45, condInt, targetMask, extraConditionBits, extraNOTConditionBits);
     }
     this.cs_inv = function (condInt, targetMask, extraConditionBits, extraNOTConditionBits)
     {
-        this.cphase(-90, condInt, targetMask, extraConditionBits, extraNOTConditionBits);
+        this.cphase_intarg(-90, condInt, targetMask, extraConditionBits, extraNOTConditionBits);
     }
     this.ct_inv = function (condInt, targetMask, extraConditionBits, extraNOTConditionBits)
     {
-        this.cphase(-45, condInt, targetMask, extraConditionBits, extraNOTConditionBits);
+        this.cphase_intarg(-45, condInt, targetMask, extraConditionBits, extraNOTConditionBits);
     }
 
 
