@@ -520,6 +520,8 @@ function QScriptInterface(qReg)
             this.qReg.staff.addInstructionAfterInsertionPoint('not', mask, 0, 0);
     }
 
+    this.cphase = function(theta, cond=~0) { this.phase(theta, 0, cond); }
+
     this.z = function(mask, cond) { this.phase(180, mask, cond); }
     this.cz = function(mask, cond) { this.phase(180, mask, cond); }
     this.s = function(mask, cond) { this.phase(90, mask, cond); }
