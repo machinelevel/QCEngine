@@ -892,7 +892,7 @@ function Qubits(numBits, name=null, qReg=null)
     {
         this.hadamard();
         this.not();
-        this.qpu.cz(0, this.bits(0, conditionMask));
+        this.phase(180, 0, ~0, conditionMask);
         this.not();
         this.hadamard();
     }
