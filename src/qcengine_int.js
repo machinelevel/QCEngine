@@ -593,9 +593,14 @@ function Qubits(numBits, name=null, qReg=null)
             this.qReg.staff.addInstructionAfterInsertionPoint('not', extraNOTConditionBits, 0, 0);
     }
 
+    // TODO: Should these two be allowed to take int args like cx?
     this.cphase = function (thetaDegrees, targetMask=~0, extraConditionBits=0)
     {
         this.qpu.cphase(thetaDegrees, this.bits(targetMask, extraConditionBits));
+    }
+    this.cz = function (condInt, targetMask=~0, extraConditionBits=0)
+    {
+        this.cphase(180, targetMask=~0, extraConditionBits);
     }
 
     this.x = function (targetMask, conditionMask, extraConditionBits, extraNOTConditionBits)
@@ -628,10 +633,6 @@ function Qubits(numBits, name=null, qReg=null)
         this.phase(-45, targetMask, conditionMask, extraConditionBits, extraNOTConditionBits);
     }
 
-    this.cz = function (condInt, targetMask, extraConditionBits, extraNOTConditionBits)
-    {
-        this.cphase_intarg(180, condInt, targetMask, extraConditionBits, extraNOTConditionBits);
-    }
     this.cs = function (condInt, targetMask, extraConditionBits, extraNOTConditionBits)
     {
         this.cphase_intarg(90, condInt, targetMask, extraConditionBits, extraNOTConditionBits);

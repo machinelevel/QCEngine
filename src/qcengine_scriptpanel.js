@@ -523,7 +523,7 @@ function QScriptInterface(qReg)
     this.cphase = function(theta, cond=~0) { this.phase(theta, 0, cond); }
 
     this.z = function(mask, cond) { this.phase(180, mask, cond); }
-    this.cz = function(mask, cond) { this.phase(180, mask, cond); }
+    this.cz = function(mask) { this.cphase(180, mask); }
     this.s = function(mask, cond) { this.phase(90, mask, cond); }
     this.t = function(mask, cond) { this.phase(45, mask, cond); }
     this.s_inv = function(mask, cond) { this.phase(-90, mask, cond); }
