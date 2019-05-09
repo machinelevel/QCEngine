@@ -594,13 +594,33 @@ function Qubits(numBits, name=null, qReg=null)
     }
 
     // TODO: Should these two be allowed to take int args like cx?
-    this.cphase = function (thetaDegrees, targetMask=~0, extraConditionBits=0)
+    this.cphase = function (thetaDegrees, condition_int=null, target_mask=null, extraConditionBits=null)
     {
-        this.qpu.cphase(thetaDegrees, this.bits(targetMask, extraConditionBits));
+        if (is_qint(condition_int)) 
+        {
+            if (target_mask == null)
+                target_mask = ~0;
+            // If the first arg is an int, then cphase the corresponding qubits of both ints
+            for (var bit_index = 0; bit_index < this.numBits && bit_index < condition_int.numBits; ++bit_index)
+            {
+                var bit = 1 << bit_index;
+                if (bit & target_mask)
+                    this.qpu.phase(thetaDegrees, this.bits(bit), condition_int.bits(bit, extraConditionBits));
+            }
+        }
+        else
+        {
+            // Otherwise, treat the mask as local to this qint 
+            extraConditionBits = target_mask;
+            target_mask = condition_int;
+            if (target_mask == null)
+                target_mask = ~0;
+            this.qpu.cphase(thetaDegrees, this.bits(target_mask, extraConditionBits));
+        }
     }
-    this.cz = function (condInt, targetMask=~0, extraConditionBits=0)
+    this.cz = function (condition_int, target_mask=null, extraConditionBits=null)
     {
-        this.cphase(180, targetMask=~0, extraConditionBits);
+        this.cphase(180, condition_int, target_mask, extraConditionBits);
     }
 
     this.x = function (targetMask, conditionMask, extraConditionBits, extraNOTConditionBits)
