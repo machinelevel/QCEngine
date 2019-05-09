@@ -2247,7 +2247,7 @@ function QStaff(qReg, qPanel, pos)
                                 // No label for a simple CZ
 //                                if (instruction.conditionQubits.countOneBits() > 1)
                                 {
-                                    if ((instruction.theta == 180.0 && qc_options.draw_s_t_z_gates)
+                                    if ((instruction.theta == 180.0 && instruction.conditionQubits.countOneBits() + instruction.targetQubits.countOneBits() > 1)
                                         || (instruction.theta == 90.0 && qc_options.draw_s_t_z_gates)
                                         || (instruction.theta == -90.0 && qc_options.draw_s_t_z_gates)
                                         || (instruction.theta == 45.0 && qc_options.draw_s_t_z_gates)
