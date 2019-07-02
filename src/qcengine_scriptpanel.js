@@ -96,7 +96,11 @@ function QScriptInterface(qReg)
     {
         if (numBits == 0)
             return null;
-        var theInt = new QInt(numBits, name, qReg.qpu);
+        // Note that the integers are unsigned by default
+        // when we use qint.new()
+        // Otherwise it's very confusing to read a
+        // value of -1 for a small number.
+        var theInt = new QUInt(numBits, name, qReg.qpu);
         if (!theInt.valid)
             return null;
         this[name] = theInt;
