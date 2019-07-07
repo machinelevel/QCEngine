@@ -97,6 +97,12 @@ function BitField(data, numBits)
   this.numBits = numBits;
   this.values = new Uint32Array(new ArrayBuffer(numBits / 8));
 
+  // Auto-convert to int
+  this.valueOf = function()
+  {
+      return bitFieldToInt(this);
+  }
+
   this.extendStorage = function(newNumBits)
   {
       // We need to extend the storge. Just create a new BF and switch to it.
