@@ -142,15 +142,13 @@ function Panel(canvas, div)
 
             this.div.onwheel = function(e)
             {
+                var handled = false;
                 for (var i = this.panel.widgets.length - 1; i >= 0 && !e.Handled; --i)
                 {
                     if (this.panel.widgets[i].mouseWheel)
-                        e.Handled = this.panel.widgets[i].mouseWheel(e);
+                        handled = this.panel.widgets[i].mouseWheel(e);
                 }
-                if (!e.Handled)
-                {
-                }
-                return false;   // Keep us from selecting text while dragging!!
+                return !handled;
             }
 
             this.div.onmouseup = function(e)

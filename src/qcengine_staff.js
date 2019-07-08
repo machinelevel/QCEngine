@@ -2755,6 +2755,7 @@ function QStaff(qReg, qPanel, pos)
 
     this.mouseWheel = function (e)
     {
+        var handled = false;
         if (e.ctrlKey == true)
         {
             var dy = e.deltaY;
@@ -2769,9 +2770,9 @@ function QStaff(qReg, qPanel, pos)
             if (this.wheelScale > 6.0)
                 this.wheelScale = 6.0;
             this.draw();
-            return false;
+            handled = true;
         }
-        return false;
+        return handled;
     }
 
     this.flipToLogicalModes = function()
