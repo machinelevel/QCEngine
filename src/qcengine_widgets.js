@@ -2172,6 +2172,7 @@ function QChart(qReg, panel, pos)
 
     this.mouseWheel = function (e)
     {
+        var handled = false;
         if (e.ctrlKey == true)
         {
             var dy = e.deltaY;
@@ -2186,7 +2187,7 @@ function QChart(qReg, panel, pos)
             if (this.wheelScale > 6.0)
                 this.wheelScale = 6.0;
             this.panel.draw();
-            return false;
+            handles = true;
         }
         else if (e.shiftKey == true)
         {
@@ -2208,15 +2209,16 @@ function QChart(qReg, panel, pos)
 //            console.log('mag: ' + this.magScale);
             this.panel.draw();
 //            console.log('mag: ' + this.magScale);
-            return false;
+            handled = true;
         }
-        else
+        else if (this.blochSphere)
         {
             var dy = e.deltaY;
             this.bloch_view_azimuth += dy * 0.05;
             this.panel.draw();
+            handled = true;
         }
-        return false;
+        return handled;
     }
 
     this.mouseDown = function (x, y)
