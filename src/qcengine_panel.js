@@ -498,8 +498,18 @@ function createDiv(x, y)
     return divTag;
 }
 
-function createStopwatchPanel(myReg, x=0, y=0, canvas=null, div=null, create_canvas=false, create_div=false)
+function createStopwatchPanel(myReg, x, y, canvas, div, create_canvas, create_div)
 {
+    // Default values (some browsers don't accept them in the declaration)
+    if (x == null)
+        x = 0;
+    if (y == null)
+        y = 0;
+    if (create_canvas == null)
+        create_canvas = false;
+    if (create_div == null)
+        create_div = false;
+
     if (create_div)
         div = createDiv(x, y);
     if (create_canvas)
@@ -535,8 +545,18 @@ function createStopwatchPanel(myReg, x=0, y=0, canvas=null, div=null, create_can
     return panel;
 }
 
-function createStaffPanel(myReg, x=0, y=0, canvas=null, div=null, create_canvas=false, create_div=false)
+function createStaffPanel(myReg, x, y, canvas, div, create_canvas, create_div)
 {
+    // Default values (some browsers don't accept them in the declaration)
+    if (x == null)
+        x = 0;
+    if (y == null)
+        y = 0;
+    if (create_canvas == null)
+        create_canvas = false;
+    if (create_div == null)
+        create_div = false;
+
     if (create_div)
         div = createDiv(x, y);
     if (create_canvas)
@@ -552,8 +572,18 @@ function createStaffPanel(myReg, x=0, y=0, canvas=null, div=null, create_canvas=
     return panel;
 }
 
-function createChartPanel(myReg, x=0, y=0, canvas=null, div=null, create_canvas=false, create_div=false)
+function createChartPanel(myReg, x, y, canvas, div, create_canvas, create_div)
 {
+    // Default values (some browsers don't accept them in the declaration)
+    if (x == null)
+        x = 0;
+    if (y == null)
+        y = 0;
+    if (create_canvas == null)
+        create_canvas = false;
+    if (create_div == null)
+        create_div = false;
+
     var int_menu_select = null;
     var int_menu_div = null;
 
