@@ -2187,7 +2187,7 @@ function QChart(qReg, panel, pos)
             if (this.wheelScale > 6.0)
                 this.wheelScale = 6.0;
             this.panel.draw();
-            handles = true;
+            handled = true;
         }
         else if (e.shiftKey == true)
         {
