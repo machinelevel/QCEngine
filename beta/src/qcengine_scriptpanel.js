@@ -73,7 +73,7 @@ function QScriptInterface(qReg)
         this.user_params[param_name] = param_value;
     }
 
-    this.get_param = function(param_name, default_value=null)
+    this.get_param = function(param_name, default_value)
     {
         value = this.user_params[param_name];
         if (value == null)
@@ -374,22 +374,22 @@ function QScriptInterface(qReg)
         this.crootx_inv = this.crootnot_inv;
     }
 
-    this.new_qubits = function(num_qubits, name=null)
+    this.new_qubits = function(num_qubits, name)
     {
         return new Qubits(num_qubits, name, this);
     }
     
-    this.new_qint = function(num_qubits, name=null)
+    this.new_qint = function(num_qubits, name)
     {
         return new QInt(num_qubits, name, this);
     }
     
-    this.new_quint = function(num_qubits, name=null)
+    this.new_quint = function(num_qubits, name)
     {
         return new QUInt(num_qubits, name, this);
     }
     
-    this.new_qfixed = function(num_qubits, radix, name=null)
+    this.new_qfixed = function(num_qubits, radix, name)
     {
         return new QFixed(num_qubits, radix, name, this);
     }
@@ -403,8 +403,10 @@ function QScriptInterface(qReg)
     {
     }
 
-    this.draw = function(expand_canvas=true)
+    this.draw = function(expand_canvas)
     {
+        if (expand_canvas == null)
+            expand_canvas = true;
         scale = this.get_param('draw_scale');
         if (scale)
             this.qReg.staff.wheelScale = scale;
@@ -465,18 +467,28 @@ function QScriptInterface(qReg)
         return this.qReg.pull_state();
     }
     
-    this.push_state = function(new_state, normalize=true)
+    this.push_state = function(new_state, normalize)
     {
+        if (normalize == null)
+            normalize = true;
         this.qReg.push_state(new_state, normalize);
     }
     
-    this.check_state = function(check_state, epsilon=0.000001)
+    this.check_state = function(check_state, epsilon)
     {
+        if (epsilon == null)
+            epsilon = 0.000001;
         return this.qReg.check_state(check_state, epsilon);
     }
     
-    this.print_state_vector = function(line=-1, min_value_to_print=0.000000001, max_num_values=1000)
+    this.print_state_vector = function(line, min_value_to_print, max_num_values)
     {
+        if (line == null)
+            line = -1;
+        if (min_value_to_print == null)
+            min_value_to_print = 0.000000001;
+        if (max_num_values == null)
+            max_num_values = 1000;
         var out_str = this.qReg.print_state_vector_to_string(line, min_value_to_print, max_num_values);
         this.print(out_str);
     }
@@ -524,7 +536,12 @@ function QScriptInterface(qReg)
             this.qReg.staff.addInstructionAfterInsertionPoint('not', mask, 0, 0);
     }
 
-    this.cphase = function(theta, cond=~0) { this.phase(theta, 0, cond); }
+    this.cphase = function(theta, cond)
+    {
+        if (cond == null)
+            cond = ~0;
+        this.phase(theta, 0, cond);
+    }
 
     this.z = function(mask, cond) { this.phase(180, mask, cond); }
     this.cz = function(mask) { this.cphase(180, mask); }
@@ -561,8 +578,10 @@ function QScriptInterface(qReg)
         return bf;
     }
 
-    this.reverse_bits = function(target_mask=0, extraConditionBits)
+    this.reverse_bits = function(target_mask, extraConditionBits)
     {
+        if (target_mask == null)
+            target_mask = 0;
         var mask = NewBitField(this.qReg.allBitsMask, this.qReg.numQubits);
         if (!isAllZero(target_mask))
             mask.andEquals(intToBitField(target_mask));
@@ -588,8 +607,12 @@ function QScriptInterface(qReg)
         mask2.recycle();
     }
 
-    this.Grover = function(target_mask=~0, condition_mask=0)
+    this.Grover = function(target_mask, condition_mask)
     {
+        if (target_mask == null)
+            target_mask = ~0;
+        if (condition_mask == null)
+            condition_mask = 0;
         this.hadamard(target_mask);
         this.x(target_mask);
         this.cz(0, target_mask|condition_mask);
@@ -597,13 +620,17 @@ function QScriptInterface(qReg)
         this.hadamard(target_mask);
     }
 
-    this.invQFT = function(target_mask=0)
+    this.invQFT = function(target_mask)
     {
+        if (target_mask == null)
+            target_mask = 0;
         this.QFT(target_mask, true);
     }
 
-    this.QFT = function(target_mask=0, flip_h=false)
+    this.QFT = function(target_mask, flip_h)
     {
+        if (target_mask == null)
+            target_mask = 0;
         if (flip_h)
             this.reverse_bits(target_mask);
         var bits = this.qReg.numQubits;
@@ -1107,7 +1134,7 @@ function runQCScriptInTextArea(textAreaName, outputAreaName, scopeBrackets)
 //     qc = qc.start();
 //     return qc;
 // }
-
+// null true 0 1 ~ false
 function QPU()
 {
     var staff_canvas = qc_options.staff_canvas;

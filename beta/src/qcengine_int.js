@@ -53,7 +53,7 @@ function make_sub_int(parent, name, sub_start, num_bits)
    return new_qint;
 }
 
-function Qubits(numBits, name=null, qReg=null)
+function Qubits(numBits, name, qReg)
 {
     // Arg flexibility: allow qreg to be passed in name slot
     if (qReg == null && name && name.qReg)
@@ -594,7 +594,7 @@ function Qubits(numBits, name=null, qReg=null)
     }
 
     // TODO: Should these two be allowed to take int args like cx?
-    this.cphase = function (thetaDegrees, condition_int=null, target_mask=null, extraConditionBits=null)
+    this.cphase = function (thetaDegrees, condition_int, target_mask, extraConditionBits)
     {
         if (is_qint(condition_int)) 
         {
@@ -618,7 +618,7 @@ function Qubits(numBits, name=null, qReg=null)
             this.qpu.cphase(thetaDegrees, this.bits(target_mask, extraConditionBits));
         }
     }
-    this.cz = function (condition_int, target_mask=null, extraConditionBits=null)
+    this.cz = function (condition_int, target_mask, extraConditionBits)
     {
         this.cphase(180, condition_int, target_mask, extraConditionBits);
     }
@@ -905,13 +905,17 @@ function Qubits(numBits, name=null, qReg=null)
         }
     }
 
-    this.invQFT = function(target_mask=~0)
+    this.invQFT = function(target_mask)
     {
+        if (target_mask == null)
+            target_mask = ~0;
         this.QFT(target_mask, true)
     }
 
-    this.QFT = function(target_mask=~0, flip_h=false)
+    this.QFT = function(target_mask, flip_h)
     {
+        if (target_mask == null)
+            target_mask = ~0;
         this.qReg.qpu.QFT(this.mask(target_mask), flip_h);
     }
 
