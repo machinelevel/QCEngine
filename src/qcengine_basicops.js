@@ -2385,8 +2385,10 @@ QReg.prototype.pull_state = function ()
     return out_array;
 }
 
-QReg.prototype.push_state = function (new_values, normalize=true)
+QReg.prototype.push_state = function (new_values, normalize)
 {
+    if (normalize == null)
+        normalize = true;
     var expected_terms = this.numValues;
     var actual_terms = new_values.length;
     if (actual_terms == expected_terms)
@@ -2414,8 +2416,10 @@ QReg.prototype.push_state = function (new_values, normalize=true)
         this.renormalize();
 }
 
-QReg.prototype.check_state = function (check_values, epsilon=0.000001)
+QReg.prototype.check_state = function (check_values, epsilon)
 {
+    if (epsilon == null)
+        epsilon = 0.000001;
     var expected_terms = this.numValues;
     var actual_terms = check_values.length;
     if (actual_terms == expected_terms)
@@ -2461,8 +2465,15 @@ QReg.prototype.check_state = function (check_values, epsilon=0.000001)
 }
 
 
-QReg.prototype.print_state_vector_to_string = function (line=-1, min_value_to_print=0.000000001, max_num_values=1000)
+QReg.prototype.print_state_vector_to_string = function (line, min_value_to_print, max_num_values)
 {
+    // Default values (some browsers don't accept them in the declaration)
+    if (line == null)
+        line = -1;
+    if (min_value_to_print == null)
+        min_value_to_print = 0.000000001;
+    if (max_num_values == null)
+        max_num_values = 1000;
     var output = "";
     if (line >= 0)
         output += 'State vector at line '+line+':\n';
