@@ -1286,6 +1286,12 @@ function QChart(qReg, panel, pos)
         ctx.rect(this.pos.x, this.pos.y, this.width, this.height);
         ctx.clip();
 
+        if (this.barHeight == 0)
+        {
+            // If there's no title/collapse bar, nudge this up a little so it looks nicer.
+            this.margin.y = this.margin.x;
+        }
+        else
         {
             // Draw the qint name
             var str = 'state vector';
@@ -2226,7 +2232,7 @@ function QChart(qReg, panel, pos)
         var radius = 15;
         var dx = x - this.collapse_x;
         var dy = y - this.collapse_y;
-        if (dx * dx + dy * dy < radius * radius)
+        if (dx * dx + dy * dy < radius * radius && this.barHeight > 0)
         {
             this.collapsed = !this.collapsed;
             this.panel.draw();
