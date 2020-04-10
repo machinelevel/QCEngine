@@ -1,1 +1,5 @@
 .DS_Store
+nodejs/node_modules
+nodejs/out_test.png
+nodejs/out_test.svg
+nodejs/package-lock.json
