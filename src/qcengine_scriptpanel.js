@@ -615,7 +615,7 @@ function QScriptInterface(qReg)
             condition_mask = 0;
         this.hadamard(target_mask);
         this.x(target_mask);
-        this.cz(0, target_mask|condition_mask);
+        this.cz(~0, target_mask|condition_mask);
         this.x(target_mask);
         this.hadamard(target_mask);
     }
